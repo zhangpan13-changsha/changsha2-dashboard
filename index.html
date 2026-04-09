@@ -50,10 +50,7 @@
     .sidebar.collapsed .nav-item[data-tip]::after{content:attr(data-tip);position:absolute;left:calc(100% + 8px);top:50%;transform:translateY(-50%);background:#2a2d3e;border:1px solid var(--border);color:var(--text-primary);padding:5px 10px;border-radius:6px;font-size:12px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .15s;z-index:999}
     .sidebar.collapsed .nav-item[data-tip]:hover::after{opacity:1}
     .sidebar-toggle{display:none}
-    /* 悬浮圆形收起/展开按钮：绝对定位在 layout 内，贴侧边栏右边缘 */
-    .sidebar-float-btn{position:absolute;top:50%;width:20px;height:44px;background:var(--bg-card);border:1px solid var(--border);border-left:none;border-radius:0 22px 22px 0;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:200;transition:left .25s ease,background .18s,border-color .18s;box-shadow:3px 0 10px rgba(0,0,0,.4);transform:translateY(-50%)}
-    .sidebar-float-btn:hover{background:var(--yellow-dim);border-color:var(--yellow)}
-    .sidebar-float-btn svg{transition:transform .25s;flex-shrink:0}
+
 
     /* ── Main ── */
     .main-wrap{flex:1;display:flex;flex-direction:column;min-width:0;overflow:auto}
@@ -225,7 +222,21 @@
         </div>
         <div class="topbar-sub">美团外卖 · 长沙二区 · 数据日期：<span id="dataDate">—</span></div>
       </div>
-      <div class="topbar-badge" id="lastUpdateBadge">数据加载中…</div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="topbar-badge" id="lastUpdateBadge">数据加载中…</div>
+        <button id="sidebarToggleBtn" onclick="toggleSidebar()" title="收起/展开侧边栏" style="
+          width:32px;height:32px;border-radius:8px;
+          background:var(--bg-secondary);border:1px solid var(--border);
+          color:var(--text-secondary);cursor:pointer;
+          display:flex;align-items:center;justify-content:center;
+          transition:background .18s,border-color .18s,color .18s;flex-shrink:0;
+        " onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--yellow)'"
+           onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-secondary)'">
+          <svg id="floatBtnIcon" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 2L5 7l4 5"/>
+          </svg>
+        </button>
+      </div>
     </div>
 
     <!-- ===== Page: 体验分 ===== -->
@@ -426,10 +437,8 @@ function toggleSidebar() {
   const sb = document.getElementById('sidebar');
   sb.classList.toggle('collapsed');
   const collapsed = sb.classList.contains('collapsed');
-  const btn = document.getElementById('sidebarFloatBtn');
   const icon = document.getElementById('floatBtnIcon');
-  btn.style.left = (collapsed ? 60 : 220) + 'px';
-  icon.style.transform = collapsed ? 'rotate(180deg)' : '';
+  if(icon) icon.style.transform = collapsed ? 'rotate(180deg)' : '';
 }
 
 
@@ -684,8 +693,6 @@ function changePage(d){
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 
 window.addEventListener('DOMContentLoaded', () => {
-  const btn = document.getElementById('sidebarFloatBtn');
-  if(btn) btn.style.left = '220px';
   switchPage('experience');
 });
 </script>
