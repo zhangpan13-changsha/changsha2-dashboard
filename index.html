@@ -78,6 +78,9 @@
     .filter-label{font-size:13px;color:var(--text-secondary);white-space:nowrap}
     select{background:var(--bg-secondary);border:1px solid var(--border);color:var(--text-primary);padding:7px 32px 7px 12px;border-radius:8px;font-size:13px;cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239fa8c9' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;min-width:150px;transition:border-color .2s}
     select:focus{outline:none;border-color:var(--yellow)}
+    .filter-input{background:var(--bg-secondary);border:1px solid var(--border);color:var(--text-primary);padding:7px 12px;border-radius:8px;font-size:13px;min-width:130px;transition:border-color .2s;outline:none}
+    .filter-input:focus{border-color:var(--yellow)}
+    .filter-input::placeholder{color:var(--text-muted)}
     .filter-divider{width:1px;height:26px;background:var(--border)}
     .btn-refresh{margin-left:auto;background:var(--yellow-dim);border:1px solid var(--yellow);color:var(--yellow);padding:7px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;transition:background .2s}
     .btn-refresh:hover{background:rgba(255,193,7,.25)}
@@ -234,13 +237,21 @@
     <div class="page-content" id="page-experience">
       <div class="filter-bar">
         <div class="filter-group">
+          <span class="filter-label">城市团队</span>
+          <input class="filter-input" id="filterCity" list="listCity" placeholder="全部城市" autocomplete="off" oninput="onCityChange()" />
+          <datalist id="listCity"></datalist>
+        </div>
+        <div class="filter-divider"></div>
+        <div class="filter-group">
           <span class="filter-label">联络点</span>
-          <select id="filterContact"><option value="">全部联络点</option></select>
+          <input class="filter-input" id="filterContact" list="listContact" placeholder="全部联络点" autocomplete="off" oninput="onContactChange()" />
+          <datalist id="listContact"></datalist>
         </div>
         <div class="filter-divider"></div>
         <div class="filter-group">
           <span class="filter-label">BD</span>
-          <select id="filterBD"><option value="">全部BD</option></select>
+          <input class="filter-input" id="filterBD" list="listBD" placeholder="全部BD" autocomplete="off" oninput="debounceLoad()" />
+          <datalist id="listBD"></datalist>
         </div>
         <div class="filter-divider"></div>
         <div class="filter-group">
@@ -423,8 +434,9 @@ async function sbFetch(params){
   return {data:await r.json(),total};
 }
 
-async function fetchAll(cp,bd,online){
+async function fetchAll(city,cp,bd,online){
   let base='data_date=eq.20260408';
+  if(city)     base+=`&city=eq.${encodeURIComponent(city)}`;
   if(cp)       base+=`&contact_point=eq.${encodeURIComponent(cp)}`;
   if(bd)       base+=`&bd_name=eq.${encodeURIComponent(bd)}`;
   if(online!=='') base+=`&is_online=eq.${online}`;
@@ -444,14 +456,15 @@ async function fetchAll(cp,bd,online){
 async function loadData(){
   const btn=document.getElementById('btnRefresh');
   btn.disabled=true; btn.classList.add('loading');
-  const cp=document.getElementById('filterContact').value;
-  const bd=document.getElementById('filterBD').value;
+  const city=document.getElementById('filterCity').value.trim();
+  const cp=document.getElementById('filterContact').value.trim();
+  const bd=document.getElementById('filterBD').value.trim();
   const on=document.getElementById('filterOnline').value;
   document.getElementById('merchantTbody').innerHTML=
     `<tr><td colspan="16"><div class="loading-overlay"><div class="spinner"></div><span>加载中…</span></div></td></tr>`;
   try{
-    allData=await fetchAll(cp,bd,on);
-    if(!document.getElementById('filterContact').dataset.loaded) await populateFilters();
+    allData=await fetchAll(city,cp,bd,on);
+    await populateFilters();
     renderKPIs(); renderCharts(); renderRanking();
     applyTab(curTab);
     const now=new Date();
@@ -467,22 +480,43 @@ async function loadData(){
   }
 }
 
+let _allCities=[], _allContacts=[], _allBDs=[], _filterLoaded=false;
+let _debTimer=null;
+function debounceLoad(){ clearTimeout(_debTimer); _debTimer=setTimeout(loadData,400); }
+
 async function populateFilters(){
+  if(_filterLoaded) return;
   const hdr={'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY};
-  const [cpR,bdR]=await Promise.all([
-    fetch(`${SB_URL}/rest/v1/${TABLE}?select=contact_point&data_date=eq.20260408`,{headers:hdr}).then(r=>r.json()),
-    fetch(`${SB_URL}/rest/v1/${TABLE}?select=bd_name&data_date=eq.20260408`,{headers:hdr}).then(r=>r.json()),
-  ]);
-  const contacts=[...new Set(cpR.map(r=>r.contact_point).filter(Boolean))].sort();
-  const bds=[...new Set(bdR.map(r=>r.bd_name).filter(Boolean))].sort();
-  const cpSel=document.getElementById('filterContact');
-  const bdSel=document.getElementById('filterBD');
-  contacts.forEach(c=>{const o=document.createElement('option');o.value=o.textContent=c;cpSel.appendChild(o)});
-  bds.forEach(b=>{const o=document.createElement('option');o.value=o.textContent=b;bdSel.appendChild(o)});
-  cpSel.dataset.loaded='1';
-  cpSel.addEventListener('change',()=>{bdSel.value='';loadData()});
-  bdSel.addEventListener('change',loadData);
-  document.getElementById('filterOnline').addEventListener('change',loadData);
+  const raw=await fetch(`${SB_URL}/rest/v1/${TABLE}?select=city,contact_point,bd_name&data_date=eq.20260408`,{headers:hdr}).then(r=>r.json());
+  _allCities=[...new Set(raw.map(r=>r.city).filter(Boolean))].sort();
+  _allContacts=[...new Set(raw.map(r=>r.contact_point).filter(Boolean))].sort();
+  _allBDs=[...new Set(raw.map(r=>r.bd_name).filter(Boolean))].sort();
+  _contactsByCity={};
+  raw.forEach(r=>{ if(r.city&&r.contact_point){ if(!_contactsByCity[r.city]) _contactsByCity[r.city]=[]; if(!_contactsByCity[r.city].includes(r.contact_point)) _contactsByCity[r.city].push(r.contact_point); } });
+  fillDatalist('listCity', _allCities);
+  fillDatalist('listContact', _allContacts);
+  fillDatalist('listBD', _allBDs);
+  document.getElementById('filterOnline').addEventListener('change', loadData);
+  _filterLoaded=true;
+}
+
+let _contactsByCity={};
+function fillDatalist(id, items){
+  const dl=document.getElementById(id); dl.innerHTML='';
+  items.forEach(v=>{ const o=document.createElement('option'); o.value=v; dl.appendChild(o); });
+}
+
+function onCityChange(){
+  const city=document.getElementById('filterCity').value.trim();
+  const contacts=city&&_contactsByCity[city]?[..._contactsByCity[city]].sort():_allContacts;
+  fillDatalist('listContact', contacts);
+  document.getElementById('filterContact').value='';
+  document.getElementById('filterBD').value='';
+  debounceLoad();
+}
+function onContactChange(){
+  document.getElementById('filterBD').value='';
+  debounceLoad();
 }
 
 function renderKPIs(){
