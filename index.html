@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>竞争体验分监控看板</title>
+  <title>长沙二区业务监控看板</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
   <style>
     :root {
@@ -13,32 +13,82 @@
       --red:#f44336;--red-dim:rgba(244,67,54,.15);
       --green:#4caf50;--green-dim:rgba(76,175,80,.15);
       --blue:#42a5f5;--orange:#ff9800;--orange-dim:rgba(255,152,0,.15);
+      --purple:#ab47bc;--purple-dim:rgba(171,71,188,.15);
+      --cyan:#26c6da;--cyan-dim:rgba(38,198,218,.15);
+      --sidebar-w:220px;--sidebar-w-collapsed:60px;
       --radius:12px;--shadow:0 4px 24px rgba(0,0,0,.4);
     }
     *{box-sizing:border-box;margin:0;padding:0}
-    body{background:var(--bg-primary);color:var(--text-primary);font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;min-height:100vh;padding:0 0 40px}
-    .header{background:linear-gradient(135deg,#1a1d27,#12152a);border-bottom:1px solid var(--border);padding:20px 32px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
-    .header-left{display:flex;align-items:center;gap:14px}
-    .header-logo{width:38px;height:38px;background:var(--yellow);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px}
-    .header-title{font-size:20px;font-weight:700}
-    .header-subtitle{font-size:13px;color:var(--text-muted);margin-top:2px}
-    .header-badge{background:var(--yellow-dim);border:1px solid var(--yellow);color:var(--yellow);padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600}
-    .main{max-width:1400px;margin:0 auto;padding:28px 32px 0}
-    .filter-bar{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:24px}
+    body{background:var(--bg-primary);color:var(--text-primary);font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;min-height:100vh;display:flex;flex-direction:column}
+
+    /* ── Layout ── */
+    .layout{display:flex;flex:1;min-height:0}
+
+    /* ── Sidebar ── */
+    .sidebar{width:var(--sidebar-w);background:linear-gradient(180deg,#12152a 0%,#0f1117 100%);border-right:1px solid var(--border);display:flex;flex-direction:column;transition:width .25s ease;flex-shrink:0;position:relative;z-index:50}
+    .sidebar.collapsed{width:var(--sidebar-w-collapsed)}
+    .sidebar-brand{padding:20px 16px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);min-height:68px;overflow:hidden;white-space:nowrap}
+    .brand-logo{width:34px;height:34px;background:var(--yellow);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+    .brand-text{overflow:hidden}
+    .brand-title{font-size:13px;font-weight:700;line-height:1.3}
+    .brand-sub{font-size:11px;color:var(--text-muted);margin-top:2px}
+    .sidebar.collapsed .brand-text{display:none}
+    .sidebar-nav{flex:1;padding:10px 8px;overflow-y:auto}
+    .nav-item{display:flex;align-items:center;gap:10px;padding:10px 10px;border-radius:9px;cursor:pointer;transition:background .18s,color .18s;margin-bottom:3px;position:relative;white-space:nowrap;overflow:hidden}
+    .nav-item:hover{background:var(--bg-card-hover)}
+    .nav-item.active{background:var(--yellow-dim);border:1px solid rgba(255,193,7,.25)}
+    .nav-item.active .nav-icon{color:var(--yellow)}
+    .nav-item.active .nav-label{color:var(--yellow);font-weight:700}
+    .nav-icon{font-size:18px;flex-shrink:0;width:20px;text-align:center}
+    .nav-label{font-size:13px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis}
+    .nav-badge{margin-left:auto;background:var(--yellow-dim);color:var(--yellow);border:1px solid rgba(255,193,7,.3);font-size:10px;padding:1px 6px;border-radius:10px;flex-shrink:0;font-weight:700}
+    .nav-badge.soon{background:rgba(92,99,145,.2);color:var(--text-muted);border-color:var(--border)}
+    .sidebar.collapsed .nav-label,.sidebar.collapsed .nav-badge{display:none}
+    .sidebar.collapsed .nav-item{justify-content:center;padding:10px 0}
+    /* tooltip on collapsed */
+    .sidebar.collapsed .nav-item[data-tip]{position:relative}
+    .sidebar.collapsed .nav-item[data-tip]::after{content:attr(data-tip);position:absolute;left:calc(100% + 8px);top:50%;transform:translateY(-50%);background:#2a2d3e;border:1px solid var(--border);color:var(--text-primary);padding:5px 10px;border-radius:6px;font-size:12px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .15s;z-index:999}
+    .sidebar.collapsed .nav-item[data-tip]:hover::after{opacity:1}
+    .sidebar-toggle{padding:12px 8px;border-top:1px solid var(--border)}
+    .toggle-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:8px;border-radius:8px;background:var(--bg-secondary);border:1px solid var(--border);color:var(--text-muted);cursor:pointer;font-size:12px;transition:all .18s}
+    .toggle-btn:hover{border-color:var(--yellow);color:var(--yellow)}
+    .toggle-icon{transition:transform .25s;font-size:14px}
+    .sidebar.collapsed .toggle-icon{transform:rotate(180deg)}
+    .sidebar.collapsed .toggle-label{display:none}
+
+    /* ── Main ── */
+    .main-wrap{flex:1;display:flex;flex-direction:column;min-width:0;overflow:auto}
+    .topbar{background:linear-gradient(135deg,#1a1d27,#12152a);border-bottom:1px solid var(--border);padding:16px 28px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+    .topbar-title{font-size:17px;font-weight:700;display:flex;align-items:center;gap:10px}
+    .topbar-icon{font-size:20px}
+    .topbar-sub{font-size:12px;color:var(--text-muted);margin-top:2px}
+    .topbar-badge{background:var(--yellow-dim);border:1px solid var(--yellow);color:var(--yellow);padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600}
+    .page-content{flex:1;padding:24px 28px 40px}
+
+    /* ── Coming Soon ── */
+    .coming-soon{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:400px;gap:20px;color:var(--text-muted)}
+    .coming-soon-icon{font-size:64px;opacity:.5}
+    .coming-soon-title{font-size:22px;font-weight:700;color:var(--text-secondary)}
+    .coming-soon-desc{font-size:14px;text-align:center;max-width:320px;line-height:1.8}
+    .coming-soon-tag{background:var(--yellow-dim);border:1px solid rgba(255,193,7,.3);color:var(--yellow);padding:6px 16px;border-radius:20px;font-size:12px;font-weight:600}
+
+    /* ── Filters ── */
+    .filter-bar{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:22px}
     .filter-group{display:flex;align-items:center;gap:8px}
     .filter-label{font-size:13px;color:var(--text-secondary);white-space:nowrap}
-    select{background:var(--bg-secondary);border:1px solid var(--border);color:var(--text-primary);padding:7px 32px 7px 12px;border-radius:8px;font-size:13px;cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239fa8c9' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;min-width:160px;transition:border-color .2s}
+    select{background:var(--bg-secondary);border:1px solid var(--border);color:var(--text-primary);padding:7px 32px 7px 12px;border-radius:8px;font-size:13px;cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239fa8c9' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;min-width:150px;transition:border-color .2s}
     select:focus{outline:none;border-color:var(--yellow)}
-    .filter-divider{width:1px;height:28px;background:var(--border)}
-    .btn-refresh{margin-left:auto;background:var(--yellow-dim);border:1px solid var(--yellow);color:var(--yellow);padding:8px 18px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;transition:background .2s}
+    .filter-divider{width:1px;height:26px;background:var(--border)}
+    .btn-refresh{margin-left:auto;background:var(--yellow-dim);border:1px solid var(--yellow);color:var(--yellow);padding:7px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;transition:background .2s}
     .btn-refresh:hover{background:rgba(255,193,7,.25)}
     .btn-refresh.loading svg{animation:spin 1s linear infinite}
     @keyframes spin{to{transform:rotate(360deg)}}
-    /* KPI 5-col */
-    .kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-bottom:24px}
+
+    /* ── KPI ── */
+    .kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:22px}
     @media(max-width:1100px){.kpi-grid{grid-template-columns:repeat(3,1fr)}}
     @media(max-width:700px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
-    .kpi-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;position:relative;overflow:hidden;transition:transform .2s,box-shadow .2s}
+    .kpi-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;position:relative;overflow:hidden;transition:transform .2s,box-shadow .2s}
     .kpi-card:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
     .kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
     .kpi-card.total::before{background:var(--blue)}
@@ -46,56 +96,59 @@
     .kpi-card.red::before{background:var(--red)}
     .kpi-card.yellow::before{background:var(--yellow)}
     .kpi-card.green::before{background:var(--green)}
-    .kpi-icon{font-size:22px;margin-bottom:10px;display:block}
-    .kpi-value{font-size:34px;font-weight:800;line-height:1;margin-bottom:6px}
+    .kpi-icon{font-size:20px;margin-bottom:8px;display:block}
+    .kpi-value{font-size:32px;font-weight:800;line-height:1;margin-bottom:5px}
     .kpi-card.total .kpi-value{color:var(--blue)}
     .kpi-card.avg .kpi-value{color:var(--orange)}
     .kpi-card.red .kpi-value{color:var(--red)}
     .kpi-card.yellow .kpi-value{color:var(--yellow)}
     .kpi-card.green .kpi-value{color:var(--green)}
-    .kpi-label{font-size:13px;color:var(--text-secondary)}
-    .kpi-pct{position:absolute;top:20px;right:20px;font-size:12px;color:var(--text-muted);background:var(--bg-secondary);padding:3px 8px;border-radius:12px}
-    /* Grid */
-    .grid-2{display:grid;grid-template-columns:1.3fr 0.7fr;gap:20px;margin-bottom:24px}
+    .kpi-label{font-size:12px;color:var(--text-secondary)}
+    .kpi-pct{position:absolute;top:18px;right:16px;font-size:11px;color:var(--text-muted);background:var(--bg-secondary);padding:2px 7px;border-radius:10px}
+
+    /* ── Charts grid ── */
+    .grid-2{display:grid;grid-template-columns:1.3fr 0.7fr;gap:18px;margin-bottom:22px}
     @media(max-width:1000px){.grid-2{grid-template-columns:1fr}}
-    .card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:20px}
-    .card-title{font-size:15px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px}
-    .card-title-dot{width:8px;height:8px;border-radius:50%;background:var(--yellow);flex-shrink:0}
-    .chart-wrap{position:relative;height:280px}
-    /* Ranking */
-    .rank-list{display:flex;flex-direction:column;gap:7px;max-height:280px;overflow-y:auto}
-    .rank-item{display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--bg-secondary);border-radius:8px;border:1px solid var(--border);transition:background .15s}
+    .card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:18px}
+    .card-title{font-size:14px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+    .card-title-dot{width:7px;height:7px;border-radius:50%;background:var(--yellow);flex-shrink:0}
+    .chart-wrap{position:relative;height:270px}
+
+    /* ── Ranking ── */
+    .rank-list{display:flex;flex-direction:column;gap:6px;max-height:270px;overflow-y:auto}
+    .rank-item{display:flex;align-items:center;gap:9px;padding:8px 11px;background:var(--bg-secondary);border-radius:8px;border:1px solid var(--border);transition:background .15s}
     .rank-item:hover{background:var(--bg-card-hover)}
-    .rank-num{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
+    .rank-num{width:21px;height:21px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0}
     .rank-num.gold{background:rgba(255,193,7,.2);color:var(--yellow);border:1px solid var(--yellow)}
     .rank-num.silver{background:rgba(158,168,200,.15);color:#9ea8c8;border:1px solid #444}
     .rank-num.bronze{background:rgba(205,127,50,.15);color:#cd7f32;border:1px solid #cd7f32}
     .rank-num.normal{background:var(--bg-card);color:var(--text-muted);border:1px solid var(--border)}
-    .rank-name{flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .rank-score{font-size:14px;font-weight:700}
+    .rank-name{flex:1;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .rank-score{font-size:13px;font-weight:700}
     .rank-meta{font-size:11px;color:var(--text-muted);white-space:nowrap}
-    /* Table */
-    .table-section{margin-bottom:24px}
-    .table-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px}
-    .table-title{font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px}
+
+    /* ── Table ── */
+    .table-section{margin-bottom:22px}
+    .table-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:10px}
+    .table-title{font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px}
     .table-tabs{display:flex;gap:6px}
-    .tab-btn{padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--bg-secondary);color:var(--text-secondary);transition:all .2s}
+    .tab-btn{padding:5px 13px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--bg-secondary);color:var(--text-secondary);transition:all .2s}
     .tab-btn.active-all{background:var(--bg-card-hover);border-color:var(--blue);color:var(--blue)}
     .tab-btn.active-red{background:var(--red-dim);border-color:var(--red);color:var(--red)}
     .tab-btn.active-yellow{background:var(--yellow-dim);border-color:var(--yellow);color:var(--yellow)}
     .table-count{font-size:12px;color:var(--text-muted);margin-left:4px}
     .table-wrap{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
-    .table-scroll{overflow-x:auto;max-height:520px;overflow-y:auto}
+    .table-scroll{overflow-x:auto;max-height:500px;overflow-y:auto}
     table{width:100%;border-collapse:collapse;font-size:13px}
     thead{position:sticky;top:0;z-index:10}
     thead tr{background:#252840}
-    th{padding:11px 14px;text-align:left;color:var(--text-muted);font-weight:600;font-size:12px;letter-spacing:.5px;border-bottom:1px solid var(--border);white-space:nowrap}
+    th{padding:10px 13px;text-align:left;color:var(--text-muted);font-weight:600;font-size:12px;letter-spacing:.5px;border-bottom:1px solid var(--border);white-space:nowrap}
     th.worst-col{color:var(--red) !important}
-    td{padding:10px 14px;border-bottom:1px solid rgba(46,50,80,.5);white-space:nowrap}
+    td{padding:9px 13px;border-bottom:1px solid rgba(46,50,80,.5);white-space:nowrap}
     tr:last-child td{border-bottom:none}
     tbody tr{transition:background .15s}
     tbody tr:hover{background:rgba(255,255,255,.03)}
-    .badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700}
+    .badge{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700}
     .badge-red{background:var(--red-dim);color:var(--red);border:1px solid rgba(244,67,54,.3)}
     .badge-yellow{background:var(--yellow-dim);color:var(--yellow);border:1px solid rgba(255,193,7,.3)}
     .badge-green{background:var(--green-dim);color:var(--green);border:1px solid rgba(76,175,80,.3)}
@@ -104,12 +157,12 @@
     .defeat-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--red)}
     .defeat-ok{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green)}
     .loading-overlay{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;color:var(--text-muted);gap:16px}
-    .spinner{width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--yellow);border-radius:50%;animation:spin .8s linear infinite}
+    .spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--yellow);border-radius:50%;animation:spin .8s linear infinite}
     .error-box{background:var(--red-dim);border:1px solid rgba(244,67,54,.3);border-radius:var(--radius);padding:20px;color:var(--red);text-align:center}
-    .footer{text-align:center;padding:20px;color:var(--text-muted);font-size:12px;margin-top:10px}
-    .pagination{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid var(--border);background:var(--bg-card)}
+    .footer{text-align:center;padding:16px 28px;color:var(--text-muted);font-size:12px;border-top:1px solid var(--border);flex-shrink:0}
+    .pagination{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:10px 14px;border-top:1px solid var(--border);background:var(--bg-card)}
     .page-info{font-size:12px;color:var(--text-muted)}
-    .page-btn{padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg-secondary);color:var(--text-secondary);cursor:pointer;font-size:12px;transition:all .15s}
+    .page-btn{padding:4px 11px;border-radius:6px;border:1px solid var(--border);background:var(--bg-secondary);color:var(--text-secondary);cursor:pointer;font-size:12px;transition:all .15s}
     .page-btn:hover:not(:disabled){border-color:var(--yellow);color:var(--yellow)}
     .page-btn:disabled{opacity:.4;cursor:not-allowed}
     [data-tip]{position:relative;cursor:help}
@@ -118,137 +171,201 @@
   </style>
 </head>
 <body>
-<header class="header">
-  <div class="header-left">
-    <div class="header-logo">🏆</div>
-    <div>
-      <div class="header-title">竞争体验分监控看板</div>
-      <div class="header-subtitle">美团外卖 · 实时数据 · <span id="dataDate">—</span></div>
-    </div>
-  </div>
-  <div class="header-badge" id="lastUpdateBadge">数据加载中…</div>
-</header>
-<div class="main">
-  <div class="filter-bar">
-    <div class="filter-group">
-      <span class="filter-label">联络点</span>
-      <select id="filterContact"><option value="">全部联络点</option></select>
-    </div>
-    <div class="filter-divider"></div>
-    <div class="filter-group">
-      <span class="filter-label">BD</span>
-      <select id="filterBD"><option value="">全部BD</option></select>
-    </div>
-    <div class="filter-divider"></div>
-    <div class="filter-group">
-      <span class="filter-label">在线状态</span>
-      <select id="filterOnline">
-        <option value="">全部门店</option>
-        <option value="true">在线营业</option>
-        <option value="false">已下线</option>
-      </select>
-    </div>
-    <button class="btn-refresh" id="btnRefresh" onclick="loadData()">
-      <svg id="refreshIcon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
-        <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
-      </svg>
-      刷新数据
-    </button>
-  </div>
 
-  <!-- 5 KPI Cards -->
-  <div class="kpi-grid">
-    <div class="kpi-card total">
-      <span class="kpi-icon">🏪</span>
-      <div class="kpi-value" id="kpiTotal">—</div>
-      <div class="kpi-label">总商家数</div>
+<div class="layout">
+  <!-- Sidebar -->
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-logo">🗺️</div>
+      <div class="brand-text">
+        <div class="brand-title">长沙二区</div>
+        <div class="brand-sub">业务监控看板</div>
+      </div>
     </div>
-    <div class="kpi-card avg">
-      <span class="kpi-icon">📊</span>
-      <div class="kpi-value" id="kpiAvg">—</div>
-      <div class="kpi-label">全区均分</div>
+    <div class="sidebar-nav">
+      <div class="nav-item" id="nav-signup" data-tip="新签&春耕" onclick="switchPage('signup')">
+        <span class="nav-icon">🌱</span>
+        <span class="nav-label">新签&春耕</span>
+        <span class="nav-badge soon">即将上线</span>
+      </div>
+      <div class="nav-item" id="nav-qianghand" data-tip="神抢手" onclick="switchPage('qianghand')">
+        <span class="nav-icon">⚡</span>
+        <span class="nav-label">神抢手</span>
+        <span class="nav-badge soon">即将上线</span>
+      </div>
+      <div class="nav-item" id="nav-coupon" data-tip="优惠感" onclick="switchPage('coupon')">
+        <span class="nav-icon">🎟️</span>
+        <span class="nav-label">优惠感</span>
+        <span class="nav-badge soon">即将上线</span>
+      </div>
+      <div class="nav-item active" id="nav-experience" data-tip="体验分" onclick="switchPage('experience')">
+        <span class="nav-icon">🏆</span>
+        <span class="nav-label">体验分</span>
+        <span class="nav-badge">实时</span>
+      </div>
+      <div class="nav-item" id="nav-mvalue" data-tip="白领M值" onclick="switchPage('mvalue')">
+        <span class="nav-icon">💼</span>
+        <span class="nav-label">白领M值</span>
+        <span class="nav-badge soon">即将上线</span>
+      </div>
     </div>
-    <div class="kpi-card red">
-      <span class="kpi-icon">🔴</span>
-      <div class="kpi-value" id="kpiRed">—</div>
-      <div class="kpi-label">红色预警（&lt; 90分）</div>
-      <div class="kpi-pct" id="kpiRedPct">—</div>
+    <div class="sidebar-toggle">
+      <button class="toggle-btn" onclick="toggleSidebar()">
+        <span class="toggle-icon">◀</span>
+        <span class="toggle-label">收起</span>
+      </button>
     </div>
-    <div class="kpi-card yellow">
-      <span class="kpi-icon">🟡</span>
-      <div class="kpi-value" id="kpiYellow">—</div>
-      <div class="kpi-label">黄色跟进（90–99分）</div>
-      <div class="kpi-pct" id="kpiYellowPct">—</div>
-    </div>
-    <div class="kpi-card green">
-      <span class="kpi-icon">✅</span>
-      <div class="kpi-value" id="kpiGreen">—</div>
-      <div class="kpi-label">正常（满分100）</div>
-      <div class="kpi-pct" id="kpiGreenPct">—</div>
-    </div>
-  </div>
+  </nav>
 
-  <!-- Charts + Ranking -->
-  <div class="grid-2">
-    <div class="card">
-      <div class="card-title"><span class="card-title-dot"></span>9项指标落败率</div>
-      <div class="chart-wrap"><canvas id="defeatChart"></canvas></div>
-    </div>
-    <div class="card">
-      <div class="card-title"><span class="card-title-dot"></span>联络点均分排名（低分优先）</div>
-      <div class="rank-list" id="rankList">
-        <div class="loading-overlay" style="padding:20px"><div class="spinner"></div></div>
+  <!-- Main -->
+  <div class="main-wrap">
+    <div class="topbar">
+      <div>
+        <div class="topbar-title">
+          <span class="topbar-icon" id="topbarIcon">🏆</span>
+          <span id="topbarTitle">体验分监控</span>
+        </div>
+        <div class="topbar-sub">美团外卖 · 长沙二区 · 数据日期：<span id="dataDate">—</span></div>
       </div>
+      <div class="topbar-badge" id="lastUpdateBadge">数据加载中…</div>
     </div>
-  </div>
 
-  <!-- Table -->
-  <div class="table-section">
-    <div class="table-header">
-      <div class="table-title">
-        <span class="card-title-dot"></span>商家明细
-        <span class="table-count" id="tableCountLabel"></span>
+    <!-- ===== Page: 体验分 ===== -->
+    <div class="page-content" id="page-experience">
+      <div class="filter-bar">
+        <div class="filter-group">
+          <span class="filter-label">联络点</span>
+          <select id="filterContact"><option value="">全部联络点</option></select>
+        </div>
+        <div class="filter-divider"></div>
+        <div class="filter-group">
+          <span class="filter-label">BD</span>
+          <select id="filterBD"><option value="">全部BD</option></select>
+        </div>
+        <div class="filter-divider"></div>
+        <div class="filter-group">
+          <span class="filter-label">在线状态</span>
+          <select id="filterOnline">
+            <option value="">全部门店</option>
+            <option value="true">在线营业</option>
+            <option value="false">已下线</option>
+          </select>
+        </div>
+        <button class="btn-refresh" id="btnRefresh" onclick="loadData()">
+          <svg id="refreshIcon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
+            <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+          </svg>
+          刷新数据
+        </button>
       </div>
-      <div class="table-tabs">
-        <button class="tab-btn active-all" id="tab-all"    onclick="switchTab('all')">全部</button>
-        <button class="tab-btn"            id="tab-red"    onclick="switchTab('red')">🔴 红色预警</button>
-        <button class="tab-btn"            id="tab-yellow" onclick="switchTab('yellow')">🟡 黄色跟进</button>
+
+      <div class="kpi-grid">
+        <div class="kpi-card total"><span class="kpi-icon">🏪</span><div class="kpi-value" id="kpiTotal">—</div><div class="kpi-label">总商家数</div></div>
+        <div class="kpi-card avg"><span class="kpi-icon">📊</span><div class="kpi-value" id="kpiAvg">—</div><div class="kpi-label">全区均分</div></div>
+        <div class="kpi-card red"><span class="kpi-icon">🔴</span><div class="kpi-value" id="kpiRed">—</div><div class="kpi-label">红色预警（&lt; 90分）</div><div class="kpi-pct" id="kpiRedPct">—</div></div>
+        <div class="kpi-card yellow"><span class="kpi-icon">🟡</span><div class="kpi-value" id="kpiYellow">—</div><div class="kpi-label">黄色跟进（90–99分）</div><div class="kpi-pct" id="kpiYellowPct">—</div></div>
+        <div class="kpi-card green"><span class="kpi-icon">✅</span><div class="kpi-value" id="kpiGreen">—</div><div class="kpi-label">正常（满分100）</div><div class="kpi-pct" id="kpiGreenPct">—</div></div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title"><span class="card-title-dot"></span>9项指标落败率</div>
+          <div class="chart-wrap"><canvas id="defeatChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="card-title-dot"></span>联络点均分排名（低分优先）</div>
+          <div class="rank-list" id="rankList">
+            <div class="loading-overlay" style="padding:20px"><div class="spinner"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="table-section">
+        <div class="table-header">
+          <div class="table-title"><span class="card-title-dot"></span>商家明细<span class="table-count" id="tableCountLabel"></span></div>
+          <div class="table-tabs">
+            <button class="tab-btn active-all" id="tab-all"    onclick="switchTab('all')">全部</button>
+            <button class="tab-btn"            id="tab-red"    onclick="switchTab('red')">🔴 红色预警</button>
+            <button class="tab-btn"            id="tab-yellow" onclick="switchTab('yellow')">🟡 黄色跟进</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th><th>门店名称</th><th>联络点</th><th>BD</th>
+                  <th>体验分 ↑</th><th>预警</th>
+                  <th id="th-f_starting_price" data-tip="起步价落败">起步价</th>
+                  <th id="th-f_biz_hours"      data-tip="营业时间落败">营业时间</th>
+                  <th id="th-f_manjian"        data-tip="满减落败">满减</th>
+                  <th id="th-f_delivery_fee"   data-tip="配送费落败">配送费</th>
+                  <th id="th-f_cashback"       data-tip="返现落败">返现</th>
+                  <th id="th-f_ladder"         data-tip="阶梯落败">阶梯</th>
+                  <th id="th-f_hot_dish"       data-tip="热门菜品落败">热门菜</th>
+                  <th id="th-f_cqs_coverage"   data-tip="CQS覆盖落败">CQS覆盖</th>
+                  <th id="th-f_cqs_price"      data-tip="CQS价格落败">CQS价格</th>
+                  <th data-tip="总落败数">落败数</th>
+                </tr>
+              </thead>
+              <tbody id="merchantTbody">
+                <tr><td colspan="16"><div class="loading-overlay"><div class="spinner"></div><span>正在从 Supabase 加载数据…</span></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="pagination">
+            <span class="page-info" id="pageInfo">—</span>
+            <button class="page-btn" id="btnPrev" onclick="changePage(-1)" disabled>‹ 上一页</button>
+            <button class="page-btn" id="btnNext" onclick="changePage(1)"  disabled>下一页 ›</button>
+          </div>
+        </div>
+      </div>
+    </div><!-- /page-experience -->
+
+    <!-- ===== Page: 新签&春耕 ===== -->
+    <div class="page-content" id="page-signup" style="display:none">
+      <div class="coming-soon">
+        <div class="coming-soon-icon">🌱</div>
+        <div class="coming-soon-title">新签&春耕</div>
+        <div class="coming-soon-desc">新签进度、春耕任务完成率、BD排行榜<br>数据接入中，即将上线</div>
+        <div class="coming-soon-tag">🚧 建设中</div>
       </div>
     </div>
-    <div class="table-wrap">
-      <div class="table-scroll">
-        <table>
-          <thead>
-            <tr>
-              <th>#</th><th>门店名称</th><th>联络点</th><th>BD</th>
-              <th>体验分 ↑</th><th>预警</th>
-              <th id="th-f_starting_price" data-tip="起步价落败">起步价</th>
-              <th id="th-f_biz_hours"      data-tip="营业时间落败">营业时间</th>
-              <th id="th-f_manjian"        data-tip="满减落败">满减</th>
-              <th id="th-f_delivery_fee"   data-tip="配送费落败">配送费</th>
-              <th id="th-f_cashback"       data-tip="返现落败">返现</th>
-              <th id="th-f_ladder"         data-tip="阶梯落败">阶梯</th>
-              <th id="th-f_hot_dish"       data-tip="热门菜品落败">热门菜</th>
-              <th id="th-f_cqs_coverage"   data-tip="CQS覆盖落败">CQS覆盖</th>
-              <th id="th-f_cqs_price"      data-tip="CQS价格落败">CQS价格</th>
-              <th data-tip="总落败数">落败数</th>
-            </tr>
-          </thead>
-          <tbody id="merchantTbody">
-            <tr><td colspan="16"><div class="loading-overlay"><div class="spinner"></div><span>正在从 Supabase 加载数据…</span></div></td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="pagination">
-        <span class="page-info" id="pageInfo">—</span>
-        <button class="page-btn" id="btnPrev" onclick="changePage(-1)" disabled>‹ 上一页</button>
-        <button class="page-btn" id="btnNext" onclick="changePage(1)"  disabled>下一页 ›</button>
+
+    <!-- ===== Page: 神抢手 ===== -->
+    <div class="page-content" id="page-qianghand" style="display:none">
+      <div class="coming-soon">
+        <div class="coming-soon-icon">⚡</div>
+        <div class="coming-soon-title">神抢手</div>
+        <div class="coming-soon-desc">神抢手覆盖率、活跃商家数、策略执行情况<br>数据接入中，即将上线</div>
+        <div class="coming-soon-tag">🚧 建设中</div>
       </div>
     </div>
-  </div>
-</div>
-<div class="footer">数据来源：美团外卖 BI 全国体验分看板 · 数据日期：<span id="footerDate">—</span> · 每工作日 08:40 自动更新</div>
+
+    <!-- ===== Page: 优惠感 ===== -->
+    <div class="page-content" id="page-coupon" style="display:none">
+      <div class="coming-soon">
+        <div class="coming-soon-icon">🎟️</div>
+        <div class="coming-soon-title">优惠感 · 新券+高价覆盖</div>
+        <div class="coming-soon-desc">神券报名率、高价商品覆盖率、券包数据<br>数据接入中，即将上线</div>
+        <div class="coming-soon-tag">🚧 建设中</div>
+      </div>
+    </div>
+
+    <!-- ===== Page: 白领M值 ===== -->
+    <div class="page-content" id="page-mvalue" style="display:none">
+      <div class="coming-soon">
+        <div class="coming-soon-icon">💼</div>
+        <div class="coming-soon-title">白领M值</div>
+        <div class="coming-soon-desc">白领商圈M值分布、重点商圈跟进情况<br>数据接入中，即将上线</div>
+        <div class="coming-soon-tag">🚧 建设中</div>
+      </div>
+    </div>
+
+    <div class="footer">数据来源：美团外卖 BI 全国体验分看板 · 数据日期：<span id="footerDate">—</span> · 每工作日 08:40 自动更新</div>
+  </div><!-- /main-wrap -->
+</div><!-- /layout -->
 
 <script>
 const SB_URL = 'https://tetfwgomiomjybvdnqul.supabase.co';
@@ -270,6 +387,33 @@ const METRICS=[
   {key:'f_cqs_price',     label:'CQS价格'},
 ];
 
+const PAGE_META = {
+  experience: { icon:'🏆', title:'体验分监控' },
+  signup:     { icon:'🌱', title:'新签&春耕' },
+  qianghand:  { icon:'⚡', title:'神抢手' },
+  coupon:     { icon:'🎟️', title:'优惠感' },
+  mvalue:     { icon:'💼', title:'白领M值' },
+};
+
+function switchPage(page) {
+  // Update nav
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  document.getElementById('nav-'+page)?.classList.add('active');
+  // Update pages
+  document.querySelectorAll('.page-content').forEach(el => el.style.display='none');
+  document.getElementById('page-'+page).style.display='block';
+  // Update topbar
+  const meta = PAGE_META[page] || {};
+  document.getElementById('topbarIcon').textContent = meta.icon || '📊';
+  document.getElementById('topbarTitle').textContent = meta.title || page;
+  // Load data if experience
+  if (page === 'experience' && allData.length === 0) loadData();
+}
+
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('collapsed');
+}
+
 async function sbFetch(params){
   const r=await fetch(`${SB_URL}/rest/v1/${TABLE}?${params}`,{
     headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Prefer':'count=exact'}
@@ -281,8 +425,8 @@ async function sbFetch(params){
 
 async function fetchAll(cp,bd,online){
   let base='data_date=eq.20260408';
-  if(cp)     base+=`&contact_point=eq.${encodeURIComponent(cp)}`;
-  if(bd)     base+=`&bd_name=eq.${encodeURIComponent(bd)}`;
+  if(cp)       base+=`&contact_point=eq.${encodeURIComponent(cp)}`;
+  if(bd)       base+=`&bd_name=eq.${encodeURIComponent(bd)}`;
   if(online!=='') base+=`&is_online=eq.${online}`;
   const ord='order=experience_score.asc.nullslast';
   const {data:first,total}=await sbFetch(`${base}&offset=0&limit=${BATCH}&${ord}`);
@@ -366,8 +510,6 @@ function renderCharts(){
     return +((d/n)*100).toFixed(1);
   });
   const colors=rates.map(v=>v>=30?'rgba(244,67,54,.85)':v>=15?'rgba(255,193,7,.85)':'rgba(76,175,80,.75)');
-
-  // Highlight worst 2 cols in table header
   const sorted=[...rates].map((v,i)=>({v,i})).sort((a,b)=>b.v-a.v);
   METRICS.forEach((_,i)=>{
     const th=document.getElementById(`th-${METRICS[i].key}`);
@@ -378,7 +520,6 @@ function renderCharts(){
     if(th) th.classList.add('worst-col');
   });
   worst2Keys=sorted.slice(0,2).map(({i})=>METRICS[i].key);
-
   if(chartInst) chartInst.destroy();
   chartInst=new Chart(document.getElementById('defeatChart').getContext('2d'),{
     type:'bar',
@@ -399,7 +540,6 @@ function renderCharts(){
 }
 
 function renderRanking(){
-  // Group by contact_point, compute avg score
   const map={};
   allData.forEach(r=>{
     const cp=r.contact_point||'未知';
@@ -409,16 +549,14 @@ function renderRanking(){
   });
   const list=Object.entries(map).map(([name,v])=>({
     name, avg:v.count?(v.sum/v.count):0, count:v.count, red:v.red
-  })).sort((a,b)=>a.avg-b.avg); // worst first
-
+  })).sort((a,b)=>a.avg-b.avg);
   const numClass=i=>i===0?'gold':i===1?'silver':i===2?'bronze':'normal';
   const scoreColor=v=>v<90?'var(--red)':v<100?'var(--yellow)':'var(--green)';
-
   document.getElementById('rankList').innerHTML=list.map((item,i)=>`
     <div class="rank-item">
       <div class="rank-num ${numClass(i)}">${i+1}</div>
       <div class="rank-name" title="${esc(item.name)}">${esc(item.name)}</div>
-      <div class="rank-score" style="color:${scoreColor(item.avg)}">${item.avg.toFixed(1)}</div>
+      <div class="rank-score" style="color:${scoreColor(item.avg)}">${Math.round(item.avg)}</div>
       <div class="rank-meta">🔴${item.red}家</div>
     </div>`).join('');
 }
@@ -481,7 +619,7 @@ function changePage(d){
 
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 
-window.addEventListener('DOMContentLoaded',loadData);
+window.addEventListener('DOMContentLoaded', () => switchPage('experience'));
 </script>
 </body>
 </html>
