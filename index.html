@@ -286,12 +286,11 @@
           <datalist id="listBD"></datalist>
         </div>
         <div class="filter-divider"></div>
-        <div class="filter-group">
+        <div class="filter-group" style="opacity:0.5;pointer-events:none" title="当前仅展示在线商家">
           <span class="filter-label">在线状态</span>
           <select id="filterOnline">
-            <option value="">全部门店</option>
-            <option value="true">在线营业</option>
-            <option value="false">已下线</option>
+            <option value="">仅在线商家</option>
+            <option value="true" selected>在线营业</option>
           </select>
         </div>
         <button class="btn-refresh" id="btnRefresh" onclick="rawData=[];_filterLoaded=false;loadData()">
@@ -543,12 +542,12 @@ async function sbFetch(params){
 }
 
 async function fetchAll(city,team,cp,bd,online){
-  let base='data_date=eq.20260408';
+  let base='data_date=eq.20260408&is_online=eq.true'; // 默认只看在线商家
   if(city)     base+=`&city=eq.${encodeURIComponent(city)}`;
   if(team)     base+=`&contact_point=like.${encodeURIComponent(team+'%')}`;
   if(cp)       base+=`&contact_point=eq.${encodeURIComponent(cp)}`;
   if(bd)       base+=`&bd_name=eq.${encodeURIComponent(bd)}`;
-  if(online!=='') base+=`&is_online=eq.${online}`;
+  // online 参数保留但默认已过滤，不再追加（全量拉的就是在线商家）
   const ord='order=experience_score.asc.nullslast';
   const {data:first,total}=await sbFetch(`${base}&offset=0&limit=${BATCH}&${ord}`);
   let rows=[...first];
@@ -589,7 +588,7 @@ async function loadData(){
         if(team && !r.contact_point?.startsWith(team)) return false;
         if(cp && r.contact_point!==cp) return false;
         if(bd && r.bd_name!==bd) return false;
-        if(on!=='' && String(r.is_online)!==on) return false;
+        // is_online 已在全量拉取时固定为 true，无需再本地过滤
         return true;
       });
     } else {
