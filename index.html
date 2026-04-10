@@ -619,8 +619,18 @@ async function sbFetch(params){
   return {data:await r.json(),total};
 }
 
+let _latestDate='';
+async function getLatestDate(){
+  if(_latestDate) return _latestDate;
+  const r=await fetch(`${SB_URL}/rest/v1/merchants?select=data_date&order=data_date.desc&limit=1`,{headers:SB_HEADERS});
+  const d=await r.json();
+  _latestDate=(d[0]&&d[0].data_date)||'';
+  return _latestDate;
+}
+
 async function fetchAll(city,team,cp,bd,online){
-  let base='data_date=eq.20260408&is_online=eq.true'; // 默认只看在线商家
+  const latestDate=await getLatestDate();
+  let base=`data_date=eq.${latestDate}&is_online=eq.true`; // 默认只看在线商家
   if(city)     base+=`&city=eq.${encodeURIComponent(city)}`;
   if(team)     base+=`&contact_point=like.${encodeURIComponent(team+'%')}`;
   if(cp)       base+=`&contact_point=eq.${encodeURIComponent(cp)}`;
