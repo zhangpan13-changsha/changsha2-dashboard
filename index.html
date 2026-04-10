@@ -140,6 +140,7 @@
     .rank-num.silver{background:rgba(158,168,200,.15);color:#9ea8c8;border:1px solid #444}
     .rank-num.bronze{background:rgba(205,127,50,.15);color:#cd7f32;border:1px solid #cd7f32}
     .rank-num.normal{background:var(--bg-card);color:var(--text-muted);border:1px solid var(--border)}
+    .rank-num.bottom-rank{background:rgba(244,67,54,.15);color:var(--red);border:1px solid rgba(244,67,54,.4)}
     .rank-name{flex:1;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .rank-score{font-size:13px;font-weight:700}
     .rank-meta{font-size:11px;color:var(--text-muted);white-space:nowrap}
@@ -275,6 +276,7 @@
           <span class="filter-label">联络点</span>
           <input class="filter-input" id="filterContact" list="listContact" placeholder="全部联络点" autocomplete="off" oninput="onContactChange()" />
           <datalist id="listContact"></datalist>
+          <span id="contactRankBadge" style="display:none;margin-left:8px;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;background:var(--yellow-dim);color:var(--yellow);border:1px solid rgba(255,193,7,.3);white-space:nowrap;cursor:default"></span>
         </div>
         <div class="filter-divider"></div>
         <div class="filter-group">
@@ -351,7 +353,7 @@
           <div class="chart-wrap"><canvas id="defeatChart"></canvas></div>
         </div>
         <div class="card">
-          <div class="card-title"><span class="card-title-dot"></span>联络点均分排名（低分优先）</div>
+          <div class="card-title"><span class="card-title-dot"></span>联络点均分排名</div>
           <div class="rank-list" id="rankList">
             <div class="loading-overlay" style="padding:20px"><div class="spinner"></div></div>
           </div>
@@ -553,7 +555,10 @@ async function loadData(){
   try{
     allData=await fetchAll(city,team,cp,bd,on);
     await populateFilters();
+    // 无筛选时重建全量联络点排名（供badge使用）
+    if(!city&&!team&&!cp&&!bd&&!on) buildContactRanking();
     renderKPIs(); renderCharts(); renderRanking();
+    updateContactRankBadge();
     applyTab(curTab);
     const now=new Date();
     document.getElementById('lastUpdateBadge').textContent=
@@ -625,6 +630,7 @@ function onTeamChange(){
 }
 function onContactChange(){
   document.getElementById('filterBD').value='';
+  updateContactRankBadge();
   debounceLoad();
 }
 
@@ -851,7 +857,26 @@ async function loadPrevChartData(){
   }catch(e){prevChartData=null;}
 }
 
+// 全量联络点排名（基于全量数据 rawData，不受筛选影响）
+let _allContactRanking=[];
+
+function buildContactRanking(){
+  // 用 rawData（全量）计算排名，供筛选器badge用
+  const src=typeof rawData!=='undefined'&&rawData.length?rawData:allData;
+  const map={};
+  src.forEach(r=>{
+    const cp=r.contact_point||'未知';
+    if(!map[cp]) map[cp]={sum:0,count:0,red:0};
+    if(r.experience_score!=null){map[cp].sum+=r.experience_score;map[cp].count++;}
+    if(r.alert_level==='red') map[cp].red++;
+  });
+  _allContactRanking=Object.entries(map).map(([name,v])=>({
+    name, avg:v.count?(v.sum/v.count):0, count:v.count, red:v.red
+  })).sort((a,b)=>b.avg-a.avg); // 高分→低分
+}
+
 function renderRanking(){
+  // 当前筛选范围内的联络点排名（高分→低分），显示 TOP3 + 尾部3
   const map={};
   allData.forEach(r=>{
     const cp=r.contact_point||'未知';
@@ -859,18 +884,59 @@ function renderRanking(){
     if(r.experience_score!=null){map[cp].sum+=r.experience_score;map[cp].count++;}
     if(r.alert_level==='red') map[cp].red++;
   });
-  const list=Object.entries(map).map(([name,v])=>({
+  const sorted=Object.entries(map).map(([name,v])=>({
     name, avg:v.count?(v.sum/v.count):0, count:v.count, red:v.red
-  })).sort((a,b)=>a.avg-b.avg);
-  const numClass=i=>i===0?'gold':i===1?'silver':i===2?'bronze':'normal';
+  })).sort((a,b)=>b.avg-a.avg); // 高分优先降序
+
+  const total=sorted.length;
+  let list=[];
+  if(total<=6){
+    list=sorted.map((item,i)=>({...item, rank:i+1, section:null}));
+  } else {
+    const top3=sorted.slice(0,3).map((item,i)=>({...item, rank:i+1, section:'top'}));
+    const bot3=sorted.slice(-3).map((item,i)=>({...item, rank:total-2+i, section:'bottom'}));
+    list=[...top3, {divider:true}, ...bot3];
+  }
+
+  const numClass=(rank,section)=>section==='top'?(rank===1?'gold':rank===2?'silver':'bronze'):'bottom-rank';
   const scoreColor=v=>v<90?'var(--red)':v<100?'var(--yellow)':'var(--green)';
-  document.getElementById('rankList').innerHTML=list.map((item,i)=>`
-    <div class="rank-item">
-      <div class="rank-num ${numClass(i)}">${i+1}</div>
-      <div class="rank-name" title="${esc(item.name)}">${esc(item.name)}</div>
+  document.getElementById('rankList').innerHTML=list.map(item=>{
+    if(item.divider) return `<div style="text-align:center;color:var(--text-muted);font-size:12px;padding:4px 0;letter-spacing:2px">· · ·</div>`;
+    const badge=item.section==='top'
+      ?`<span style="font-size:10px;color:var(--green);background:var(--green-dim);border-radius:10px;padding:1px 6px;margin-left:4px">TOP</span>`
+      :item.section==='bottom'
+      ?`<span style="font-size:10px;color:var(--red);background:var(--red-dim);border-radius:10px;padding:1px 6px;margin-left:4px">末位</span>`
+      :'';
+    return `<div class="rank-item">
+      <div class="rank-num ${numClass(item.rank,item.section)}">${item.rank}</div>
+      <div class="rank-name" title="${esc(item.name)}">${esc(item.name)}${badge}</div>
       <div class="rank-score" style="color:${scoreColor(item.avg)}">${item.avg.toFixed(2)}</div>
       <div class="rank-meta">🔴${item.red}家</div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
+}
+
+function updateContactRankBadge(){
+  const badge=document.getElementById('contactRankBadge');
+  const cp=document.getElementById('filterContact').value.trim();
+  if(!cp){badge.style.display='none';return;}
+  // 确保全量排名已建立
+  if(!_allContactRanking.length) buildContactRanking();
+  const idx=_allContactRanking.findIndex(r=>r.name===cp);
+  if(idx<0){badge.style.display='none';return;}
+  const rank=idx+1;
+  const total=_allContactRanking.length;
+  const pct=((rank/total)*100).toFixed(0);
+  badge.textContent=`第${rank}名 · 前${pct}%`;
+  // 颜色：前20%绿，后20%红，其余黄
+  if(rank/total<=0.2){
+    badge.style.background='var(--green-dim)';badge.style.color='var(--green)';badge.style.borderColor='rgba(76,175,80,.3)';
+  } else if(rank/total>=0.8){
+    badge.style.background='var(--red-dim)';badge.style.color='var(--red)';badge.style.borderColor='rgba(244,67,54,.3)';
+  } else {
+    badge.style.background='var(--yellow-dim)';badge.style.color='var(--yellow)';badge.style.borderColor='rgba(255,193,7,.3)';
+  }
+  badge.style.display='inline-block';
 }
 
 /* ── 视图切换 ── */
