@@ -285,14 +285,8 @@
           <input class="filter-input" id="filterBD" list="listBD" placeholder="全部BD" autocomplete="off" oninput="debounceLoad()" />
           <datalist id="listBD"></datalist>
         </div>
-        <div class="filter-divider"></div>
-        <div class="filter-group" style="opacity:0.5;pointer-events:none" title="当前仅展示在线商家">
-          <span class="filter-label">在线状态</span>
-          <select id="filterOnline">
-            <option value="">仅在线商家</option>
-            <option value="true" selected>在线营业</option>
-          </select>
-        </div>
+        <!-- 在线状态筛选器已隐藏：默认只拉在线商家(is_online=true)，无需显示 -->
+        <select id="filterOnline" style="display:none"><option value="true" selected>在线营业</option></select>
         <button class="btn-refresh" id="btnRefresh" onclick="rawData=[];_filterLoaded=false;loadData()">
           <svg id="refreshIcon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
