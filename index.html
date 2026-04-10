@@ -552,15 +552,15 @@ const PAGE_SIZE = 50, BATCH = 2000;
 let allData=[], rawData=[], filteredData=[], curPage=1, curTab='all', chartInst=null, worst2Keys=[], prevChartData=null;
 
 const METRICS=[
-  {key:'f_starting_price',label:'起步价',   scoreKey:'starting_price_score'},
-  {key:'f_biz_hours',     label:'营业时间', scoreKey:'biz_hours_score'},
-  {key:'f_manjian',       label:'满减',     scoreKey:'manjian_score'},
-  {key:'f_delivery_fee',  label:'配送费',   scoreKey:'delivery_fee_score'},
-  {key:'f_cashback',      label:'追补YZ',   scoreKey:'cashback_score'},
-  {key:'f_ladder',        label:'阶梯',     scoreKey:'ladder_score'},
-  {key:'f_hot_dish',      label:'热门菜',   scoreKey:'hot_dish_score'},
-  {key:'f_cqs_coverage',  label:'CQS覆盖',  scoreKey:'cqs_coverage_score'},
-  {key:'f_cqs_price',     label:'CQS价格',  scoreKey:'cqs_price_score'},
+  {key:'f_starting_price',label:'起步价',   scoreKey:'starting_price_score', mtKey:'mt_starting_price', bKey:'b_starting_price', unit:'元'},
+  {key:'f_biz_hours',     label:'营业时间', scoreKey:'biz_hours_score',      mtKey:'mt_biz_hours',      bKey:'b_biz_hours',      unit:''},
+  {key:'f_manjian',       label:'满减',     scoreKey:'manjian_score',        mtKey:'mt_manjian',        bKey:'b_manjian',        unit:''},
+  {key:'f_delivery_fee',  label:'配送费',   scoreKey:'delivery_fee_score',   mtKey:'mt_delivery_fee',   bKey:'b_delivery_fee',   unit:'元'},
+  {key:'f_cashback',      label:'追补YZ',   scoreKey:'cashback_score',       mtKey:'mt_cashback_yz',    bKey:'b_cashback_yz',    unit:''},
+  {key:'f_ladder',        label:'阶梯',     scoreKey:'ladder_score',         mtKey:'mt_ladder',         bKey:'b_ladder',         unit:''},
+  {key:'f_hot_dish',      label:'热门菜',   scoreKey:'hot_dish_score',       mtKey:'mt_hot_dish_flag',  bKey:'b_hot_dish_flag',  unit:''},
+  {key:'f_cqs_coverage',  label:'CQS覆盖',  scoreKey:'cqs_coverage_score',   mtKey:null,                bKey:null,               unit:''},
+  {key:'f_cqs_price',     label:'CQS价格',  scoreKey:'cqs_price_score',      mtKey:null,                bKey:null,               unit:''},
 ];
 // 判断某商家某指标是否落败（得分 < 90 即为落败）
 function isDefeated(r, m){ return r[m.scoreKey]!=null && r[m.scoreKey]<90; }
@@ -1247,18 +1247,36 @@ function renderPage(){
         :'';
       // 落败详情行（点击展开）
       const defeatedMetrics=METRICS.filter(m=>isDefeated(r,m));
-      const SCORE_MAP={f_starting_price:'starting_price_score',f_biz_hours:'biz_hours_score',f_manjian:'manjian_score',f_delivery_fee:'delivery_fee_score',f_cashback:'cashback_score',f_ladder:'ladder_score',f_hot_dish:'hot_dish_score',f_cqs_coverage:'cqs_coverage_score',f_cqs_price:'cqs_price_score'};
       const detailRowId=`detail-row-${rank}`;
       const detailHtml=defeatedMetrics.length===0
         ?'<span style="color:var(--green)">✅ 无落败项</span>'
         :defeatedMetrics.map(m=>{
-            const myScore=r[SCORE_MAP[m.key]];
-            const scoreStr=myScore!=null?`<span style="color:var(--red);font-weight:700">${Number(myScore).toFixed(1)}分</span>`:'<span style="color:var(--text-muted)">—</span>';
-            return `<span style="display:inline-flex;align-items:center;gap:4px;margin:3px 6px 3px 0;background:rgba(244,67,54,.1);border:1px solid rgba(244,67,54,.25);border-radius:6px;padding:3px 10px;font-size:12px">
-              <span style="color:var(--text-muted)">📍 ${m.label}</span>
-              <span style="color:var(--text-muted)">我方</span>${scoreStr}
-              <span style="color:var(--text-muted);font-size:10px">（满分100）</span>
-            </span>`;
+            const myScore=r[m.scoreKey];
+            const scoreStr=myScore!=null?Number(myScore).toFixed(1)+'分':'—';
+            // 原始业务值
+            const hasRaw=m.mtKey&&(r[m.mtKey]!=null||r[m.bKey]!=null);
+            const fmtRaw=(v,unit)=>{
+              if(v==null||v===''||v==='None') return '<span style="color:var(--text-muted)">—</span>';
+              // 热门菜 flag
+              if(unit===''&&(v===0||v===1||v==='0'||v==='1')) return v==1||v==='1'?'<span style="color:var(--green)">✅ 有</span>':'<span style="color:var(--red)">❌ 无</span>';
+              // 配送费（小数转元）
+              if(m.key==='f_delivery_fee'){const n=parseFloat(v);return isNaN(n)?v:`<span style="color:var(--yellow)">${(n).toFixed(2)}元</span>`;}
+              // 配送时效（小时）
+              if(m.key==='f_cashback_yz'){return `<span style="color:var(--yellow)">${v}</span>`;}
+              return `<span style="color:var(--yellow)">${v}${unit?unit:''}</span>`;
+            };
+            const mtVal=hasRaw?r[m.mtKey]:null;
+            const bVal=hasRaw?r[m.bKey]:null;
+            const rawBlock=hasRaw?`
+              <span style="display:flex;align-items:center;gap:6px;margin-top:4px;font-size:11px">
+                <span style="color:#42a5f5">🏪 我方：</span>${fmtRaw(mtVal,m.unit)}
+                <span style="color:var(--text-muted);margin:0 4px">vs</span>
+                <span style="color:#ef5350">🥊 对手：</span>${fmtRaw(bVal,m.unit)}
+              </span>`:'';
+            return `<div style="display:inline-flex;flex-direction:column;margin:3px 8px 3px 0;background:rgba(244,67,54,.1);border:1px solid rgba(244,67,54,.25);border-radius:8px;padding:6px 12px;font-size:12px;min-width:140px">
+              <span style="color:var(--text-muted);margin-bottom:2px">📍 ${m.label} · <span style="color:var(--red);font-weight:700">${scoreStr}</span></span>
+              ${rawBlock}
+            </div>`;
           }).join('');
       return [
         `<tr style="cursor:pointer" onclick="toggleDetailRow('${detailRowId}')">
