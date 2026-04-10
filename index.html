@@ -548,16 +548,18 @@ const PAGE_SIZE = 50, BATCH = 2000;
 let allData=[], rawData=[], filteredData=[], curPage=1, curTab='all', chartInst=null, worst2Keys=[], prevChartData=null;
 
 const METRICS=[
-  {key:'f_starting_price',label:'起步价'},
-  {key:'f_biz_hours',     label:'营业时间'},
-  {key:'f_manjian',       label:'满减'},
-  {key:'f_delivery_fee',  label:'配送费'},
-  {key:'f_cashback',      label:'追补YZ'},
-  {key:'f_ladder',        label:'阶梯'},
-  {key:'f_hot_dish',      label:'热门菜'},
-  {key:'f_cqs_coverage',  label:'CQS覆盖'},
-  {key:'f_cqs_price',     label:'CQS价格'},
+  {key:'f_starting_price',label:'起步价',   scoreKey:'starting_price_score'},
+  {key:'f_biz_hours',     label:'营业时间', scoreKey:'biz_hours_score'},
+  {key:'f_manjian',       label:'满减',     scoreKey:'manjian_score'},
+  {key:'f_delivery_fee',  label:'配送费',   scoreKey:'delivery_fee_score'},
+  {key:'f_cashback',      label:'追补YZ',   scoreKey:'cashback_score'},
+  {key:'f_ladder',        label:'阶梯',     scoreKey:'ladder_score'},
+  {key:'f_hot_dish',      label:'热门菜',   scoreKey:'hot_dish_score'},
+  {key:'f_cqs_coverage',  label:'CQS覆盖',  scoreKey:'cqs_coverage_score'},
+  {key:'f_cqs_price',     label:'CQS价格',  scoreKey:'cqs_price_score'},
 ];
+// 判断某商家某指标是否落败（得分 < 90 即为落败）
+function isDefeated(r, m){ return r[m.scoreKey]!=null && r[m.scoreKey]<90; }
 
 const PAGE_META = {
   experience: { icon:'🏆', title:'体验分监控' },
@@ -828,7 +830,7 @@ function buildFilterParams(){
 
 function renderCharts(){
   const n=allData.length||1;
-  const rates=METRICS.map(m=>+((allData.filter(r=>r[m.key]===1).length/n)*100).toFixed(1));
+  const rates=METRICS.map(m=>+((allData.filter(r=>isDefeated(r,m)).length/n)*100).toFixed(1));
   // 各指标均分（score字段名：f_xxx对应xxx_score）
   const scoreKeys={
     f_starting_price:'starting_price_score',f_biz_hours:'biz_hours_score',
@@ -948,7 +950,7 @@ async function loadPrevChartData(curRates, curAvgs){
     const yn=yd.length||1;
     const scoreKeys={f_starting_price:'starting_price_score',f_biz_hours:'biz_hours_score',f_manjian:'manjian_score',f_delivery_fee:'delivery_fee_score',f_cashback:'cashback_score',f_ladder:'ladder_score',f_hot_dish:'hot_dish_score',f_cqs_coverage:'cqs_coverage_score',f_cqs_price:'cqs_price_score'};
     prevChartData={
-      rates:METRICS.map(m=>+((yd.filter(r=>r[m.key]===1).length/yn)*100).toFixed(1)),
+      rates:METRICS.map(m=>+((yd.filter(r=>isDefeated(r,m)).length/yn)*100).toFixed(1)),
       avgs:METRICS.map(m=>{const sk=scoreKeys[m.key];const v=yd.filter(r=>r[sk]!=null);return v.length?+(v.reduce((s,r)=>s+r[sk],0)/v.length).toFixed(1):null;})
     };
     // 上期数据加载完后刷新数据行
@@ -1232,15 +1234,15 @@ function renderPage(){
         :r.alert_level==='yellow'?'<span class="badge badge-yellow">🟡 跟进</span>'
         :'<span class="badge badge-green">✅ 正常</span>';
       const dot=v=>v===1?'<span class="defeat-dot"></span>':'<span class="defeat-ok"></span>';
-      // 实时计算落败项数，不依赖 f_all（f_all 字段写入可能有误）
-      const fallCount=METRICS.filter(m=>r[m.key]===1).length;
+      // 落败定义：子项得分 < 90 分
+      const fallCount=METRICS.filter(m=>isDefeated(r,m)).length;
       const fallColor=fallCount>4?'var(--red)':fallCount>2?'var(--yellow)':'var(--text-primary)';
       // 落败项数 badge（紧跟预警后）
       const fallBadge=fallCount>0
         ?`<span style="margin-left:4px;font-size:10px;font-weight:700;color:${fallColor};background:${fallCount>4?'rgba(244,67,54,.15)':fallCount>2?'rgba(255,193,7,.15)':'rgba(255,255,255,.07)'};border-radius:8px;padding:1px 6px">落败${fallCount}项</span>`
         :'';
       // 落败详情行（点击展开）
-      const defeatedMetrics=METRICS.filter(m=>r[m.key]===1);
+      const defeatedMetrics=METRICS.filter(m=>isDefeated(r,m));
       const SCORE_MAP={f_starting_price:'starting_price_score',f_biz_hours:'biz_hours_score',f_manjian:'manjian_score',f_delivery_fee:'delivery_fee_score',f_cashback:'cashback_score',f_ladder:'ladder_score',f_hot_dish:'hot_dish_score',f_cqs_coverage:'cqs_coverage_score',f_cqs_price:'cqs_price_score'};
       const detailRowId=`detail-row-${rank}`;
       const detailHtml=defeatedMetrics.length===0
@@ -1262,7 +1264,7 @@ function renderPage(){
           <td>${esc(r.bd_name||'—')}</td>
           <td class="score-cell ${scCls}">${sc}</td>
           <td>${badge}${fallBadge}</td>
-          ${METRICS.map(m=>`<td${worst2Keys.includes(m.key)&&r[m.key]===1?' style="background:rgba(244,67,54,.15)"':''}>${dot(r[m.key])}</td>`).join('')}
+          ${METRICS.map(m=>{const defeated=isDefeated(r,m);const sc=r[m.scoreKey];const highlight=worst2Keys.includes(m.key)&&defeated?' style="background:rgba(244,67,54,.15)"':'';return `<td${highlight}>${sc!=null?sc.toFixed(1):'—'}</td>`;}).join('')}
           <td style="font-weight:700;color:${fallColor}">${fallCount}</td>
         </tr>`,
         `<tr id="${detailRowId}" style="display:none">
