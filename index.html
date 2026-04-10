@@ -485,7 +485,7 @@
 const SB_URL = 'https://tetfwgomiomjybvdnqul.supabase.co';
 const SB_KEY = 'sb_publishable_TThJ3m4iPyAq58lb6KYreg_b65QF9cB';
 const TABLE  = 'merchants';
-const PAGE_SIZE = 50, BATCH = 1000;
+const PAGE_SIZE = 50, BATCH = 2000;
 
 let allData=[], rawData=[], filteredData=[], curPage=1, curTab='all', chartInst=null, worst2Keys=[], prevChartData=null;
 
@@ -575,6 +575,8 @@ async function loadData(){
   try{
     // 首次加载：先拉全量（用于筛选器+节点排名），再用已有全量做本地筛选
     if(!rawData.length){
+      document.getElementById('merchantTbody').innerHTML=
+        `<tr><td colspan="16"><div class="loading-overlay"><div class="spinner"></div><span>首次加载全量数据，约需5-10秒…</span></div></td></tr>`;
       rawData=await fetchAll('','','','','');
       buildContactRanking();
       _filterLoaded=false; // 强制重建筛选器
