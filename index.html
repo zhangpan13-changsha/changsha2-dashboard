@@ -270,6 +270,7 @@
           <span class="filter-label">城市团队</span>
           <input class="filter-input" id="filterTeam" list="listTeam" placeholder="全部团队" autocomplete="off" oninput="onTeamChange()" />
           <datalist id="listTeam"></datalist>
+          <span id="teamRankBadge" style="display:none;margin-left:8px;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;background:var(--yellow-dim);color:var(--yellow);border:1px solid rgba(255,193,7,.3);white-space:nowrap;cursor:default"></span>
         </div>
         <div class="filter-divider"></div>
         <div class="filter-group">
@@ -347,15 +348,29 @@
         </div>
       </div>
 
-      <div class="grid-2">
-        <div class="card">
-          <div class="card-title"><span class="card-title-dot"></span>9项指标 · 均分 &amp; 落败率</div>
-          <div class="chart-wrap"><canvas id="defeatChart"></canvas></div>
-        </div>
-        <div class="card">
-          <div class="card-title"><span class="card-title-dot"></span>联络点均分排名</div>
-          <div class="rank-list" id="rankList">
-            <div class="loading-overlay" style="padding:20px"><div class="spinner"></div></div>
+      <!-- 9项指标全宽 -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-title"><span class="card-title-dot"></span>9项指标 · 均分 &amp; 落败率</div>
+        <div class="chart-wrap" style="height:260px"><canvas id="defeatChart"></canvas></div>
+      </div>
+
+      <!-- 节点排名大板块 -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-title"><span class="card-title-dot"></span>节点排名</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:8px">
+          <!-- 联络点排名 -->
+          <div>
+            <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;padding-left:4px">📍 联络点（TOP3 + 末位3）</div>
+            <div class="rank-list" id="rankList">
+              <div class="loading-overlay" style="padding:20px"><div class="spinner"></div></div>
+            </div>
+          </div>
+          <!-- 城市团队排名 -->
+          <div>
+            <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;padding-left:4px">🏙️ 城市团队（全部）</div>
+            <div class="rank-list" id="teamRankList">
+              <div class="loading-overlay" style="padding:20px"><div class="spinner"></div></div>
+            </div>
           </div>
         </div>
       </div>
@@ -555,10 +570,10 @@ async function loadData(){
   try{
     allData=await fetchAll(city,team,cp,bd,on);
     await populateFilters();
-    // 无筛选时重建全量联络点排名（供badge使用）
+    // 无筛选时重建全量排名（供badge使用）
     if(!city&&!team&&!cp&&!bd&&!on) buildContactRanking();
-    renderKPIs(); renderCharts(); renderRanking();
-    updateContactRankBadge();
+    renderKPIs(); renderCharts(); renderRanking(); renderTeamRanking();
+    updateContactRankBadge(); updateTeamRankBadge();
     applyTab(curTab);
     const now=new Date();
     document.getElementById('lastUpdateBadge').textContent=
@@ -626,6 +641,7 @@ function onTeamChange(){
   fillDatalist('listContact', contacts);
   document.getElementById('filterContact').value='';
   document.getElementById('filterBD').value='';
+  updateTeamRankBadge();
   debounceLoad();
 }
 function onContactChange(){
@@ -857,22 +873,33 @@ async function loadPrevChartData(){
   }catch(e){prevChartData=null;}
 }
 
-// 全量联络点排名（基于全量数据 rawData，不受筛选影响）
-let _allContactRanking=[];
+// 全量联络点 & 城市团队排名（基于全量数据，不受筛选影响）
+let _allContactRanking=[], _allTeamRanking=[];
 
 function buildContactRanking(){
-  // 用 rawData（全量）计算排名，供筛选器badge用
-  const src=typeof rawData!=='undefined'&&rawData.length?rawData:allData;
-  const map={};
+  const src=allData; // 当前无筛选时调用，即为全量
+  // --- 联络点 ---
+  const cpMap={};
   src.forEach(r=>{
     const cp=r.contact_point||'未知';
-    if(!map[cp]) map[cp]={sum:0,count:0,red:0};
-    if(r.experience_score!=null){map[cp].sum+=r.experience_score;map[cp].count++;}
-    if(r.alert_level==='red') map[cp].red++;
+    if(!cpMap[cp]) cpMap[cp]={sum:0,count:0,red:0};
+    if(r.experience_score!=null){cpMap[cp].sum+=r.experience_score;cpMap[cp].count++;}
+    if(r.alert_level==='red') cpMap[cp].red++;
   });
-  _allContactRanking=Object.entries(map).map(([name,v])=>({
+  _allContactRanking=Object.entries(cpMap).map(([name,v])=>({
     name, avg:v.count?(v.sum/v.count):0, count:v.count, red:v.red
-  })).sort((a,b)=>b.avg-a.avg); // 高分→低分
+  })).sort((a,b)=>b.avg-a.avg);
+  // --- 城市团队（用 extractTeam 提取，与筛选器一致）---
+  const tmMap={};
+  src.forEach(r=>{
+    const tm=extractTeam(r.contact_point, r.city)||'未知';
+    if(!tmMap[tm]) tmMap[tm]={sum:0,count:0,red:0};
+    if(r.experience_score!=null){tmMap[tm].sum+=r.experience_score;tmMap[tm].count++;}
+    if(r.alert_level==='red') tmMap[tm].red++;
+  });
+  _allTeamRanking=Object.entries(tmMap).map(([name,v])=>({
+    name, avg:v.count?(v.sum/v.count):0, count:v.count, red:v.red
+  })).sort((a,b)=>b.avg-a.avg);
 }
 
 function renderRanking(){
@@ -916,27 +943,59 @@ function renderRanking(){
   }).join('');
 }
 
+function _applyRankBadge(badgeEl, rankIdx, total){
+  if(rankIdx<0){badgeEl.style.display='none';return;}
+  const rank=rankIdx+1;
+  const pct=((rank/total)*100).toFixed(0);
+  badgeEl.textContent=`第${rank}名 · 前${pct}%`;
+  if(rank/total<=0.2){
+    badgeEl.style.background='var(--green-dim)';badgeEl.style.color='var(--green)';badgeEl.style.borderColor='rgba(76,175,80,.3)';
+  } else if(rank/total>=0.8){
+    badgeEl.style.background='var(--red-dim)';badgeEl.style.color='var(--red)';badgeEl.style.borderColor='rgba(244,67,54,.3)';
+  } else {
+    badgeEl.style.background='var(--yellow-dim)';badgeEl.style.color='var(--yellow)';badgeEl.style.borderColor='rgba(255,193,7,.3)';
+  }
+  badgeEl.style.display='inline-block';
+}
+
 function updateContactRankBadge(){
   const badge=document.getElementById('contactRankBadge');
   const cp=document.getElementById('filterContact').value.trim();
   if(!cp){badge.style.display='none';return;}
-  // 确保全量排名已建立
   if(!_allContactRanking.length) buildContactRanking();
-  const idx=_allContactRanking.findIndex(r=>r.name===cp);
-  if(idx<0){badge.style.display='none';return;}
-  const rank=idx+1;
-  const total=_allContactRanking.length;
-  const pct=((rank/total)*100).toFixed(0);
-  badge.textContent=`第${rank}名 · 前${pct}%`;
-  // 颜色：前20%绿，后20%红，其余黄
-  if(rank/total<=0.2){
-    badge.style.background='var(--green-dim)';badge.style.color='var(--green)';badge.style.borderColor='rgba(76,175,80,.3)';
-  } else if(rank/total>=0.8){
-    badge.style.background='var(--red-dim)';badge.style.color='var(--red)';badge.style.borderColor='rgba(244,67,54,.3)';
-  } else {
-    badge.style.background='var(--yellow-dim)';badge.style.color='var(--yellow)';badge.style.borderColor='rgba(255,193,7,.3)';
-  }
-  badge.style.display='inline-block';
+  _applyRankBadge(badge, _allContactRanking.findIndex(r=>r.name===cp), _allContactRanking.length);
+}
+
+function updateTeamRankBadge(){
+  const badge=document.getElementById('teamRankBadge');
+  const tm=document.getElementById('filterTeam').value.trim();
+  if(!tm){badge.style.display='none';return;}
+  if(!_allTeamRanking.length) buildContactRanking();
+  _applyRankBadge(badge, _allTeamRanking.findIndex(r=>r.name===tm), _allTeamRanking.length);
+}
+
+function renderTeamRanking(){
+  // 基于全量 _allTeamRanking，高分→低分，全部显示
+  if(!_allTeamRanking.length) buildContactRanking();
+  const list=_allTeamRanking;
+  const total=list.length;
+  const scoreColor=v=>v<90?'var(--red)':v<100?'var(--yellow)':'var(--green)';
+  const numCls=(i,total)=>{
+    if(i===0) return 'gold';
+    if(i===1) return 'silver';
+    if(i===2) return 'bronze';
+    if(i>=total-1) return 'bottom-rank';
+    return 'normal';
+  };
+  const el=document.getElementById('teamRankList');
+  if(!el) return;
+  el.innerHTML=list.map((item,i)=>`
+    <div class="rank-item">
+      <div class="rank-num ${numCls(i,total)}">${i+1}</div>
+      <div class="rank-name" title="${esc(item.name)}">${esc(item.name)}</div>
+      <div class="rank-score" style="color:${scoreColor(item.avg)}">${item.avg.toFixed(2)}</div>
+      <div class="rank-meta">🔴${item.red}家</div>
+    </div>`).join('');
 }
 
 /* ── 视图切换 ── */
