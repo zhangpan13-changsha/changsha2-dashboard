@@ -436,12 +436,12 @@
         <div id="detailFilters" style="display:flex;align-items:center;gap:12px;padding:10px 0 4px 0;flex-wrap:wrap;">
           <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted)">
             <span>得分区间</span>
-            <select id="dfScoreOp" onchange="applyDetailFilter()" style="background:var(--card-bg);border:1px solid var(--border);color:var(--text-primary);border-radius:6px;padding:3px 8px;font-size:12px;cursor:pointer">
+            <select id="dfScoreOp" onchange="applyDetailFilter();document.getElementById('dfScoreVal').style.display=this.value?'inline-block':'none';document.getElementById('dfScoreVal').value=''" style="background:var(--card-bg);border:1px solid var(--border);color:var(--text-primary);border-radius:6px;padding:3px 8px;font-size:12px;cursor:pointer">
               <option value="">不限</option>
               <option value="lt">低于</option>
               <option value="gt">高于</option>
             </select>
-            <input id="dfScoreVal" type="number" min="0" max="100" placeholder="分值" oninput="applyDetailFilter()" style="width:64px;background:var(--card-bg);border:1px solid var(--border);color:var(--text-primary);border-radius:6px;padding:3px 8px;font-size:12px">
+            <input id="dfScoreVal" type="number" min="0" max="100" placeholder="输入分值" oninput="applyDetailFilter()" style="display:none;width:72px;background:var(--card-bg);border:1px solid var(--border);color:var(--text-primary);border-radius:6px;padding:3px 8px;font-size:12px">
           </div>
           <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted)">
             <span>落败指标</span>
