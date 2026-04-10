@@ -1232,8 +1232,8 @@ function renderPage(){
         :r.alert_level==='yellow'?'<span class="badge badge-yellow">🟡 跟进</span>'
         :'<span class="badge badge-green">✅ 正常</span>';
       const dot=v=>v===1?'<span class="defeat-dot"></span>':'<span class="defeat-ok"></span>';
-      const fallCount=typeof r.f_all==='number'?r.f_all:
-        METRICS.filter(m=>r[m.key]===1).length;
+      // 实时计算落败项数，不依赖 f_all（f_all 字段写入可能有误）
+      const fallCount=METRICS.filter(m=>r[m.key]===1).length;
       const fallColor=fallCount>4?'var(--red)':fallCount>2?'var(--yellow)':'var(--text-primary)';
       // 落败项数 badge（紧跟预警后）
       const fallBadge=fallCount>0
