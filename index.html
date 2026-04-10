@@ -84,6 +84,12 @@
     .btn-refresh.loading svg{animation:spin 1s linear infinite}
     @keyframes spin{to{transform:rotate(360deg)}}
 
+    /* ── View Tabs ── */
+    .view-tabs{display:flex;gap:0;margin-bottom:18px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:4px;width:fit-content}
+    .view-tab-btn{padding:7px 20px;border-radius:calc(var(--radius) - 2px);font-size:13px;font-weight:600;cursor:pointer;border:none;background:transparent;color:var(--text-secondary);transition:all .2s;white-space:nowrap}
+    .view-tab-btn:hover{color:var(--text-primary)}
+    .view-tab-btn.active{background:var(--yellow);color:#1a1a2e;box-shadow:0 2px 6px rgba(255,193,7,.35)}
+
     /* ── KPI ── */
     .kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:18px}
     @media(max-width:1300px){.kpi-grid{grid-template-columns:repeat(3,1fr)}}
@@ -283,6 +289,15 @@
         </button>
       </div>
 
+      <!-- 视图切换 Tab -->
+      <div class="view-tabs">
+        <button class="view-tab-btn active" id="vtab-overview" onclick="switchView('overview')">竞争分概览</button>
+        <button class="view-tab-btn"        id="vtab-cqs"      onclick="switchView('cqs')">CQS概览</button>
+        <button class="view-tab-btn"        id="vtab-detail"   onclick="switchView('detail')">商家明细</button>
+      </div>
+
+      <!-- 视图：竞争分概览 -->
+      <div id="view-overview">
       <div class="kpi-grid">
         <div class="kpi-card total"><span class="kpi-icon">🏪</span><div class="kpi-value" id="kpiTotal">—</div><div class="kpi-label">总商家数</div></div>
         <div class="kpi-card avg"><span class="kpi-icon">📊</span><div class="kpi-value" id="kpiAvg">—</div><div class="kpi-label">全区均分</div></div>
@@ -304,6 +319,20 @@
         </div>
       </div>
 
+      </div><!-- /view-overview -->
+
+      <!-- 视图：CQS概览 -->
+      <div id="view-cqs" style="display:none">
+        <div class="coming-soon">
+          <div class="coming-soon-icon">📋</div>
+          <div class="coming-soon-title">CQS概览</div>
+          <div class="coming-soon-desc">CQS商家覆盖率、菜品价格合规率、落败明细<br>数据接入中，即将上线</div>
+          <div class="coming-soon-tag">🚧 建设中</div>
+        </div>
+      </div>
+
+      <!-- 视图：商家明细 -->
+      <div id="view-detail">
       <div class="table-section">
         <div class="table-header">
           <div class="table-title"><span class="card-title-dot"></span>商家明细<span class="table-count" id="tableCountLabel"></span></div>
@@ -344,6 +373,7 @@
           </div>
         </div>
       </div>
+      </div><!-- /view-detail -->
     </div><!-- /page-experience -->
 
     <!-- ===== Page: 新签&春耕 ===== -->
@@ -633,6 +663,16 @@ function renderRanking(){
       <div class="rank-score" style="color:${scoreColor(item.avg)}">${item.avg.toFixed(2)}</div>
       <div class="rank-meta">🔴${item.red}家</div>
     </div>`).join('');
+}
+
+/* ── 视图切换 ── */
+function switchView(view){
+  ['overview','cqs','detail'].forEach(v=>{
+    const el=document.getElementById(`view-${v}`);
+    if(el) el.style.display=(v===view?'':'none');
+    const btn=document.getElementById(`vtab-${v}`);
+    if(btn) btn.classList.toggle('active',v===view);
+  });
 }
 
 function switchTab(tab){
