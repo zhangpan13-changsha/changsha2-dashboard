@@ -437,6 +437,35 @@
             <button class="tab-btn"            id="tab-yellow" onclick="switchTab('yellow')">🟡 黄色跟进</button>
           </div>
         </div>
+        <!-- 商家明细筛选器 -->
+        <div id="detailFilters" style="display:flex;align-items:center;gap:12px;padding:10px 0 4px 0;flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted)">
+            <span>得分区间</span>
+            <select id="dfScoreOp" onchange="applyDetailFilter()" style="background:var(--card-bg);border:1px solid var(--border);color:var(--text-primary);border-radius:6px;padding:3px 8px;font-size:12px;cursor:pointer">
+              <option value="">不限</option>
+              <option value="lt">低于</option>
+              <option value="gt">高于</option>
+            </select>
+            <input id="dfScoreVal" type="number" min="0" max="100" placeholder="分值" oninput="applyDetailFilter()" style="width:64px;background:var(--card-bg);border:1px solid var(--border);color:var(--text-primary);border-radius:6px;padding:3px 8px;font-size:12px">
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted)">
+            <span>落败指标</span>
+            <select id="dfMetric" onchange="applyDetailFilter()" style="background:var(--card-bg);border:1px solid var(--border);color:var(--text-primary);border-radius:6px;padding:3px 24px 3px 8px;font-size:12px;cursor:pointer;min-width:100px">
+              <option value="">全部</option>
+              <option value="f_starting_price">起步价</option>
+              <option value="f_biz_hours">营业时间</option>
+              <option value="f_manjian">满减</option>
+              <option value="f_delivery_fee">配送费</option>
+              <option value="f_cashback">追补YZ</option>
+              <option value="f_ladder">阶梯</option>
+              <option value="f_hot_dish">热门菜</option>
+              <option value="f_cqs_coverage">CQS覆盖</option>
+              <option value="f_cqs_price">CQS价格</option>
+            </select>
+          </div>
+          <span id="dfResultCount" style="font-size:11px;color:var(--text-muted)"></span>
+          <button onclick="clearDetailFilter()" style="font-size:11px;color:var(--text-muted);background:none;border:1px solid var(--border);border-radius:6px;padding:3px 10px;cursor:pointer">重置</button>
+        </div>
         <div class="table-wrap">
           <div class="table-scroll">
             <table>
@@ -1178,7 +1207,7 @@ function renderPage(){
   const tp=Math.ceil(filteredData.length/PAGE_SIZE)||1;
   document.getElementById('merchantTbody').innerHTML=rows.length===0
     ?`<tr><td colspan="16" style="text-align:center;padding:40px;color:var(--text-muted)">暂无数据</td></tr>`
-    :rows.map((r,i)=>{
+    :rows.flatMap((r,i)=>{
       const rank=s+i+1;
       const sc=r.experience_score!=null?Number(r.experience_score).toFixed(2):'—';
       const scCls=r.alert_level==='red'?'score-red':r.alert_level==='yellow'?'score-yellow':'score-green';
@@ -1186,22 +1215,88 @@ function renderPage(){
         :r.alert_level==='yellow'?'<span class="badge badge-yellow">🟡 跟进</span>'
         :'<span class="badge badge-green">✅ 正常</span>';
       const dot=v=>v===1?'<span class="defeat-dot"></span>':'<span class="defeat-ok"></span>';
-      const fallCount=r.f_all??'—';
-      const fallColor=typeof fallCount==='number'?(fallCount>4?'var(--red)':fallCount>2?'var(--yellow)':'var(--text-primary)'):'var(--text-muted)';
-      return `<tr>
-        <td style="color:var(--text-muted);font-size:11px">${rank}</td>
-        <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis" title="${esc(r.poi_name)}">${esc(r.poi_name||'—')}</td>
-        <td>${esc(r.contact_point||'—')}</td>
-        <td>${esc(r.bd_name||'—')}</td>
-        <td class="score-cell ${scCls}">${sc}</td>
-        <td>${badge}</td>
-        ${METRICS.map(m=>`<td${worst2Keys.includes(m.key)&&r[m.key]===1?' style="background:rgba(244,67,54,.15)"':''}>${dot(r[m.key])}</td>`).join('')}
-        <td style="font-weight:700;color:${fallColor}">${fallCount}</td>
-      </tr>`;
+      const fallCount=typeof r.f_all==='number'?r.f_all:
+        METRICS.filter(m=>r[m.key]===1).length;
+      const fallColor=fallCount>4?'var(--red)':fallCount>2?'var(--yellow)':'var(--text-primary)';
+      // 落败项数 badge（紧跟预警后）
+      const fallBadge=fallCount>0
+        ?`<span style="margin-left:4px;font-size:10px;font-weight:700;color:${fallColor};background:${fallCount>4?'rgba(244,67,54,.15)':fallCount>2?'rgba(255,193,7,.15)':'rgba(255,255,255,.07)'};border-radius:8px;padding:1px 6px">落败${fallCount}项</span>`
+        :'';
+      // 落败详情行（点击展开）
+      const defeatedMetrics=METRICS.filter(m=>r[m.key]===1);
+      const SCORE_MAP={f_starting_price:'starting_price_score',f_biz_hours:'biz_hours_score',f_manjian:'manjian_score',f_delivery_fee:'delivery_fee_score',f_cashback:'cashback_score',f_ladder:'ladder_score',f_hot_dish:'hot_dish_score',f_cqs_coverage:'cqs_coverage_score',f_cqs_price:'cqs_price_score'};
+      const detailRowId=`detail-row-${rank}`;
+      const detailHtml=defeatedMetrics.length===0
+        ?'<span style="color:var(--green)">✅ 无落败项</span>'
+        :defeatedMetrics.map(m=>{
+            const myScore=r[SCORE_MAP[m.key]];
+            const scoreStr=myScore!=null?`<span style="color:var(--red);font-weight:700">${Number(myScore).toFixed(1)}分</span>`:'<span style="color:var(--text-muted)">—</span>';
+            return `<span style="display:inline-flex;align-items:center;gap:4px;margin:3px 6px 3px 0;background:rgba(244,67,54,.1);border:1px solid rgba(244,67,54,.25);border-radius:6px;padding:3px 10px;font-size:12px">
+              <span style="color:var(--text-muted)">📍 ${m.label}</span>
+              <span style="color:var(--text-muted)">我方</span>${scoreStr}
+              <span style="color:var(--text-muted);font-size:10px">（满分100）</span>
+            </span>`;
+          }).join('');
+      return [
+        `<tr style="cursor:pointer" onclick="toggleDetailRow('${detailRowId}')">
+          <td style="color:var(--text-muted);font-size:11px">${rank}</td>
+          <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis" title="${esc(r.poi_name)}">${esc(r.poi_name||'—')}</td>
+          <td>${esc(r.contact_point||'—')}</td>
+          <td>${esc(r.bd_name||'—')}</td>
+          <td class="score-cell ${scCls}">${sc}</td>
+          <td>${badge}${fallBadge}</td>
+          ${METRICS.map(m=>`<td${worst2Keys.includes(m.key)&&r[m.key]===1?' style="background:rgba(244,67,54,.15)"':''}>${dot(r[m.key])}</td>`).join('')}
+          <td style="font-weight:700;color:${fallColor}">${fallCount}</td>
+        </tr>`,
+        `<tr id="${detailRowId}" style="display:none">
+          <td colspan="16" style="padding:8px 16px 12px 40px;background:rgba(255,193,7,.04);border-bottom:1px solid var(--border)">
+            <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">📊 ${esc(r.poi_name||'')} · 落败详情</div>
+            <div style="display:flex;flex-wrap:wrap">${detailHtml}</div>
+          </td>
+        </tr>`
+      ];
     }).join('');
   document.getElementById('pageInfo').textContent=`第 ${curPage} / ${tp} 页，共 ${filteredData.length.toLocaleString()} 条`;
   document.getElementById('btnPrev').disabled=curPage<=1;
   document.getElementById('btnNext').disabled=curPage>=tp;
+}
+
+function toggleDetailRow(id){
+  const row=document.getElementById(id);
+  if(!row) return;
+  row.style.display=row.style.display==='none'?'table-row':'none';
+}
+
+function applyDetailFilter(){
+  const op=document.getElementById('dfScoreOp')?.value||'';
+  const val=parseFloat(document.getElementById('dfScoreVal')?.value||'');
+  const metric=document.getElementById('dfMetric')?.value||'';
+  // 基于 allData（已经受顶部筛选影响）再做二次过滤
+  const base=curTab==='red'?allData.filter(r=>r.alert_level==='red')
+    :curTab==='yellow'?allData.filter(r=>r.alert_level==='yellow')
+    :allData;
+  filteredData=base.filter(r=>{
+    if(op==='lt' && !isNaN(val) && r.experience_score!=null && Number(r.experience_score)>=val) return false;
+    if(op==='gt' && !isNaN(val) && r.experience_score!=null && Number(r.experience_score)<=val) return false;
+    if(metric && r[metric]!==1) return false;
+    return true;
+  });
+  curPage=1;
+  const cnt=document.getElementById('dfResultCount');
+  if(cnt) cnt.textContent=`筛选结果：${filteredData.length} 家`;
+  renderPage();
+}
+
+function clearDetailFilter(){
+  const op=document.getElementById('dfScoreOp');
+  const val=document.getElementById('dfScoreVal');
+  const metric=document.getElementById('dfMetric');
+  if(op) op.value='';
+  if(val) val.value='';
+  if(metric) metric.value='';
+  const cnt=document.getElementById('dfResultCount');
+  if(cnt) cnt.textContent='';
+  switchTab(curTab); // 恢复原始 filteredData
 }
 
 function changePage(d){
