@@ -503,22 +503,23 @@ let _allCities=[], _allTeams=[], _allContacts=[], _allBDs=[], _filterLoaded=fals
 let _debTimer=null;
 function debounceLoad(){ clearTimeout(_debTimer); _debTimer=setTimeout(loadData,400); }
 
-// 从 contact_point 提取城市团队前缀（如"长沙一区"）
-function extractTeam(cp){ const m=cp&&cp.match(/^(.+?区)/); return m?m[1]:null; }
+// 从 contact_point 提取城市团队前缀
+// 优先匹配"XX区"（如长沙一区、南昌二区），匹配不到则回退用 city 字段（九江/赣州/黄石）
+function extractTeam(cp, city){ const m=cp&&cp.match(/^(.+?区)/); return m?m[1]:(city||null); }
 
 async function populateFilters(){
   if(_filterLoaded) return;
   const hdr={'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY};
-  const raw=await fetch(`${SB_URL}/rest/v1/${TABLE}?select=city,contact_point,bd_name&data_date=eq.20260408`,{headers:hdr}).then(r=>r.json());
+  const raw=await fetch(`${SB_URL}/rest/v1/${TABLE}?select=city,contact_point,bd_name&data_date=eq.20260408&limit=10000`,{headers:hdr}).then(r=>r.json());
   _allCities=[...new Set(raw.map(r=>r.city).filter(Boolean))].sort();
-  _allTeams=[...new Set(raw.map(r=>extractTeam(r.contact_point)).filter(Boolean))].sort();
+  _allTeams=[...new Set(raw.map(r=>extractTeam(r.contact_point,r.city)).filter(Boolean))].sort();
   _allContacts=[...new Set(raw.map(r=>r.contact_point).filter(Boolean))].sort();
   _allBDs=[...new Set(raw.map(r=>r.bd_name).filter(Boolean))].sort();
   // 建立映射
   _teamsByCity={};
   _contactsByTeam={};
   raw.forEach(r=>{
-    const team=extractTeam(r.contact_point);
+    const team=extractTeam(r.contact_point,r.city);
     if(r.city&&team){ if(!_teamsByCity[r.city]) _teamsByCity[r.city]=[]; if(!_teamsByCity[r.city].includes(team)) _teamsByCity[r.city].push(team); }
     if(team&&r.contact_point){ if(!_contactsByTeam[team]) _contactsByTeam[team]=[]; if(!_contactsByTeam[team].includes(r.contact_point)) _contactsByTeam[team].push(r.contact_point); }
   });
