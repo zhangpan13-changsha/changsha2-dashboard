@@ -102,15 +102,26 @@
     .kpi-card.red::before{background:var(--red)}
     .kpi-card.yellow::before{background:var(--yellow)}
     .kpi-card.green::before{background:var(--green)}
-    .kpi-icon{font-size:20px;margin-bottom:8px;display:block}
-    .kpi-value{font-size:32px;font-weight:800;line-height:1;margin-bottom:5px}
+    .kpi-icon{font-size:20px;margin-bottom:6px;display:block}
+    .kpi-value{font-size:32px;font-weight:800;line-height:1;margin-bottom:4px}
     .kpi-card.total .kpi-value{color:var(--blue)}
     .kpi-card.avg .kpi-value{color:var(--orange)}
     .kpi-card.red .kpi-value{color:var(--red)}
     .kpi-card.yellow .kpi-value{color:var(--yellow)}
     .kpi-card.green .kpi-value{color:var(--green)}
-    .kpi-label{font-size:12px;color:var(--text-secondary)}
-    .kpi-pct{position:absolute;top:18px;right:16px;font-size:11px;color:var(--text-muted);background:var(--bg-secondary);padding:2px 7px;border-radius:10px}
+    .kpi-label{font-size:12px;color:var(--text-secondary);margin-bottom:4px}
+    .kpi-pct{font-size:13px;font-weight:700;margin-bottom:6px}
+    .kpi-card.red .kpi-pct{color:var(--red)}
+    .kpi-card.yellow .kpi-pct{color:var(--yellow)}
+    .kpi-card.green .kpi-pct{color:var(--green)}
+    .kpi-card.total .kpi-pct{color:var(--blue)}
+    .kpi-card.avg .kpi-pct{color:var(--orange)}
+    .kpi-change{font-size:11px;display:flex;align-items:center;gap:4px;color:var(--text-muted)}
+    .kpi-change .up{color:#f44336}
+    .kpi-change .down{color:#4caf50}
+    .kpi-change .avg-up{color:#f44336}
+    .kpi-change .avg-down{color:#4caf50}
+    .kpi-change .neutral{color:var(--text-muted)}
 
     /* ── Charts grid ── */
     .grid-2{display:grid;grid-template-columns:1.3fr 0.7fr;gap:14px;margin-bottom:18px}
@@ -299,11 +310,39 @@
       <!-- 视图：竞争分概览 -->
       <div id="view-overview">
       <div class="kpi-grid">
-        <div class="kpi-card total"><span class="kpi-icon">🏪</span><div class="kpi-value" id="kpiTotal">—</div><div class="kpi-label">总商家数</div></div>
-        <div class="kpi-card avg"><span class="kpi-icon">📊</span><div class="kpi-value" id="kpiAvg">—</div><div class="kpi-label">全区均分</div></div>
-        <div class="kpi-card red"><span class="kpi-icon">🔴</span><div class="kpi-value" id="kpiRed">—</div><div class="kpi-label">红色预警（&lt; 90分）</div><div class="kpi-pct" id="kpiRedPct">—</div></div>
-        <div class="kpi-card yellow"><span class="kpi-icon">🟡</span><div class="kpi-value" id="kpiYellow">—</div><div class="kpi-label">黄色跟进（90–99分）</div><div class="kpi-pct" id="kpiYellowPct">—</div></div>
-        <div class="kpi-card green"><span class="kpi-icon">✅</span><div class="kpi-value" id="kpiGreen">—</div><div class="kpi-label">正常（满分100）</div><div class="kpi-pct" id="kpiGreenPct">—</div></div>
+        <div class="kpi-card total">
+          <span class="kpi-icon">🏪</span>
+          <div class="kpi-value" id="kpiTotal">—</div>
+          <div class="kpi-label">总商家数</div>
+          <div class="kpi-change" id="kpiTotalChange"><span class="neutral">昨日对比加载中…</span></div>
+        </div>
+        <div class="kpi-card avg">
+          <span class="kpi-icon">📊</span>
+          <div class="kpi-value" id="kpiAvg">—</div>
+          <div class="kpi-label">全区均分</div>
+          <div class="kpi-change" id="kpiAvgChange"><span class="neutral">昨日对比加载中…</span></div>
+        </div>
+        <div class="kpi-card red">
+          <span class="kpi-icon">🔴</span>
+          <div class="kpi-value" id="kpiRed">—</div>
+          <div class="kpi-label">红色预警（&lt; 90分）</div>
+          <div class="kpi-pct" id="kpiRedPct">—</div>
+          <div class="kpi-change" id="kpiRedChange"><span class="neutral">昨日对比加载中…</span></div>
+        </div>
+        <div class="kpi-card yellow">
+          <span class="kpi-icon">🟡</span>
+          <div class="kpi-value" id="kpiYellow">—</div>
+          <div class="kpi-label">黄色跟进（90–99分）</div>
+          <div class="kpi-pct" id="kpiYellowPct">—</div>
+          <div class="kpi-change" id="kpiYellowChange"><span class="neutral">昨日对比加载中…</span></div>
+        </div>
+        <div class="kpi-card green">
+          <span class="kpi-icon">✅</span>
+          <div class="kpi-value" id="kpiGreen">—</div>
+          <div class="kpi-label">正常（满分100）</div>
+          <div class="kpi-pct" id="kpiGreenPct">—</div>
+          <div class="kpi-change" id="kpiGreenChange"><span class="neutral">昨日对比加载中…</span></div>
+        </div>
       </div>
 
       <div class="grid-2">
@@ -602,9 +641,88 @@ function renderKPIs(){
   document.getElementById('kpiYellow').textContent=yellow.toLocaleString();
   document.getElementById('kpiGreen').textContent=green.toLocaleString();
   const pct=v=>n?`${((v/n)*100).toFixed(1)}%`:'—';
-  document.getElementById('kpiRedPct').textContent=pct(red);
-  document.getElementById('kpiYellowPct').textContent=pct(yellow);
-  document.getElementById('kpiGreenPct').textContent=pct(green);
+  document.getElementById('kpiRedPct').textContent=`占比 ${pct(red)}`;
+  document.getElementById('kpiYellowPct').textContent=`占比 ${pct(yellow)}`;
+  document.getElementById('kpiGreenPct').textContent=`占比 ${pct(green)}`;
+  // 昨日对比（异步加载）
+  loadYesterdayKPIs({n, red, yellow, green, avg});
+}
+
+async function loadYesterdayKPIs(today){
+  // 获取数据库中最近两个 data_date
+  const noChange=id=>{
+    const el=document.getElementById(id);
+    if(el) el.innerHTML='<span class="neutral">暂无历史数据</span>';
+  };
+  try{
+    const res=await fetch(`${SB_URL}/rest/v1/merchants?select=data_date&limit=1&order=data_date.desc`,{
+      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}
+    });
+    const rows=await res.json();
+    if(!rows||!rows.length){['kpiTotalChange','kpiAvgChange','kpiRedChange','kpiYellowChange','kpiGreenChange'].forEach(noChange);return;}
+    const latestDate=rows[0].data_date;
+    // 找前一天日期（先查 distinct dates）
+    const res2=await fetch(`${SB_URL}/rest/v1/merchants?select=data_date&limit=10000`,{
+      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Prefer':'count=none'}
+    });
+    const all2=await res2.json();
+    const dates=[...new Set(all2.map(r=>r.data_date))].sort();
+    if(dates.length<2){['kpiTotalChange','kpiAvgChange','kpiRedChange','kpiYellowChange','kpiGreenChange'].forEach(noChange);return;}
+    const prevDate=dates[dates.length-2];
+    // 拉前一天数据（全量，加筛选条件）
+    const filterParams=buildFilterParams();
+    const url=`${SB_URL}/rest/v1/merchants?select=alert_level,experience_score,data_date&data_date=eq.${prevDate}${filterParams}&limit=10000`;
+    const res3=await fetch(url,{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});
+    const yd=await res3.json();
+    const yn=yd.length;
+    const yred=yd.filter(r=>r.alert_level==='red').length;
+    const yyellow=yd.filter(r=>r.alert_level==='yellow').length;
+    const ygreen=yd.filter(r=>r.alert_level==='normal').length;
+    const yscored=yd.filter(r=>r.experience_score!=null);
+    const yavg=yscored.length?(yscored.reduce((s,r)=>s+r.experience_score,0)/yscored.length):0;
+    const setChange=(id,cur,prev,reverse=false)=>{
+      const el=document.getElementById(id); if(!el)return;
+      const diff=cur-prev;
+      if(diff===0){el.innerHTML='<span class="neutral">与昨日持平</span>';return;}
+      const isGood=reverse?(diff<0):(diff>0);
+      const cls=isGood?'down':'up';
+      const arrow=diff>0?'↑':'↓';
+      el.innerHTML=`<span class="${cls}">${arrow}${Math.abs(diff).toLocaleString()} 较昨日（${prevDate}）</span>`;
+    };
+    const setChangeFloat=(id,cur,prev)=>{
+      const el=document.getElementById(id); if(!el)return;
+      const diff=+(cur-prev).toFixed(2);
+      if(diff===0){el.innerHTML='<span class="neutral">与昨日持平</span>';return;}
+      const isGood=diff>0;
+      const cls=isGood?'avg-down':'avg-up';
+      const arrow=diff>0?'↑':'↓';
+      el.innerHTML=`<span class="${cls}">${arrow}${Math.abs(diff).toFixed(2)} 较昨日（${prevDate}）</span>`;
+    };
+    setChange('kpiTotalChange', today.n, yn);
+    setChangeFloat('kpiAvgChange', today.avg, yavg);
+    setChange('kpiRedChange', today.red, yred, true);    // 红色预警↓是好事
+    setChange('kpiYellowChange', today.yellow, yyellow, true);
+    setChange('kpiGreenChange', today.green, ygreen, false); // 正常↑是好事
+  }catch(e){
+    ['kpiTotalChange','kpiAvgChange','kpiRedChange','kpiYellowChange','kpiGreenChange'].forEach(noChange);
+  }
+}
+
+// 构建当前筛选条件的 URL 参数（用于昨日对比拉同口径数据）
+function buildFilterParams(){
+  let p='';
+  const city=document.getElementById('filterCity')?.value?.trim();
+  const team=document.getElementById('filterTeam')?.value?.trim();
+  const contact=document.getElementById('filterContact')?.value?.trim();
+  const bd=document.getElementById('filterBD')?.value?.trim();
+  const online=document.getElementById('filterOnline')?.value;
+  if(city) p+=`&city=eq.${encodeURIComponent(city)}`;
+  if(online!==undefined&&online!=='') p+=`&is_online=eq.${online}`;
+  // team/contact/bd 用 ilike
+  if(team) p+=`&contact_point=ilike.*${encodeURIComponent(team)}*`;
+  if(contact) p+=`&contact_point=eq.${encodeURIComponent(contact)}`;
+  if(bd) p+=`&bd_name=ilike.*${encodeURIComponent(bd)}*`;
+  return p;
 }
 
 function renderCharts(){
