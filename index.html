@@ -294,7 +294,7 @@
             <option value="false">已下线</option>
           </select>
         </div>
-        <button class="btn-refresh" id="btnRefresh" onclick="loadData()">
+        <button class="btn-refresh" id="btnRefresh" onclick="rawData=[];_filterLoaded=false;loadData()">
           <svg id="refreshIcon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
             <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
@@ -573,15 +573,25 @@ async function loadData(){
   document.getElementById('merchantTbody').innerHTML=
     `<tr><td colspan="16"><div class="loading-overlay"><div class="spinner"></div><span>加载中…</span></div></td></tr>`;
   try{
-    allData=await fetchAll(city,team,cp,bd,on);
-    // 全量数据（无任何筛选）单独缓存，供节点排名+badge使用
-    if(!city&&!team&&!cp&&!bd&&!on){
-      rawData=[...allData];
-      buildContactRanking();
-    } else if(!rawData.length){
-      // 首次带筛选进入时也要拉一次全量
+    // 首次加载：先拉全量（用于筛选器+节点排名），再用已有全量做本地筛选
+    if(!rawData.length){
       rawData=await fetchAll('','','','','');
       buildContactRanking();
+      _filterLoaded=false; // 强制重建筛选器
+    }
+    // 本地筛选，不再发额外请求
+    const hasFilter=city||team||cp||bd||on;
+    if(hasFilter){
+      allData=rawData.filter(r=>{
+        if(city && r.city!==city) return false;
+        if(team && !r.contact_point?.startsWith(team)) return false;
+        if(cp && r.contact_point!==cp) return false;
+        if(bd && r.bd_name!==bd) return false;
+        if(on!=='' && String(r.is_online)!==on) return false;
+        return true;
+      });
+    } else {
+      allData=[...rawData];
     }
     await populateFilters();
     renderKPIs(); renderCharts(); renderRanking(); renderTeamRanking();
@@ -610,8 +620,7 @@ function extractTeam(cp, city){ const m=cp&&cp.match(/^(.+?区)/); return m?m[1]
 
 async function populateFilters(){
   if(_filterLoaded) return;
-  const hdr={'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY};
-  const raw=await fetch(`${SB_URL}/rest/v1/${TABLE}?select=city,contact_point,bd_name&data_date=eq.20260408&limit=10000`,{headers:hdr}).then(r=>r.json());
+  const raw=rawData.length?rawData:allData; // 直接用内存全量，不发请求
   _allCities=[...new Set(raw.map(r=>r.city).filter(Boolean))].sort();
   _allTeams=[...new Set(raw.map(r=>extractTeam(r.contact_point,r.city)).filter(Boolean))].sort();
   _allContacts=[...new Set(raw.map(r=>r.contact_point).filter(Boolean))].sort();
@@ -689,15 +698,13 @@ async function loadYesterdayKPIs(today){
     if(el) el.innerHTML='<span class="neutral">暂无历史数据</span>';
   };
   try{
-    const res=await fetch(`${SB_URL}/rest/v1/merchants?select=data_date&limit=1&order=data_date.desc`,{
+    // 用 rawData 中已知的最新日期，避免再发请求
+    const knownDates=[...new Set(rawData.map(r=>r.data_date).filter(Boolean))].sort();
+    if(!knownDates.length){['kpiTotalChange','kpiAvgChange','kpiRedChange','kpiYellowChange','kpiGreenChange'].forEach(noChange);return;}
+    const latestDate=knownDates[knownDates.length-1];
+    // 找前一天日期（查一次即可，limit 小）
+    const res2=await fetch(`${SB_URL}/rest/v1/merchants?select=data_date&limit=100&order=data_date.desc`,{
       headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}
-    });
-    const rows=await res.json();
-    if(!rows||!rows.length){['kpiTotalChange','kpiAvgChange','kpiRedChange','kpiYellowChange','kpiGreenChange'].forEach(noChange);return;}
-    const latestDate=rows[0].data_date;
-    // 找前一天日期（先查 distinct dates）
-    const res2=await fetch(`${SB_URL}/rest/v1/merchants?select=data_date&limit=10000`,{
-      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Prefer':'count=none'}
     });
     const all2=await res2.json();
     const dates=[...new Set(all2.map(r=>r.data_date))].sort();
@@ -866,7 +873,7 @@ function renderCharts(){
 
 async function loadPrevChartData(curRates, curAvgs){
   try{
-    const res=await fetch(`${SB_URL}/rest/v1/merchants?select=data_date&limit=10000`,{
+    const res=await fetch(`${SB_URL}/rest/v1/merchants?select=data_date&limit=100&order=data_date.desc`,{
       headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}
     });
     const rows=await res.json();
