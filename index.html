@@ -567,7 +567,7 @@ function renderKPIs(){
   const scored=allData.filter(r=>r.experience_score!=null);
   const avg=scored.length?(scored.reduce((s,r)=>s+r.experience_score,0)/scored.length):0;
   document.getElementById('kpiTotal').textContent=n.toLocaleString();
-  document.getElementById('kpiAvg').textContent=Math.round(avg);
+  document.getElementById('kpiAvg').textContent=avg.toFixed(2);
   document.getElementById('kpiRed').textContent=red.toLocaleString();
   document.getElementById('kpiYellow').textContent=yellow.toLocaleString();
   document.getElementById('kpiGreen').textContent=green.toLocaleString();
@@ -630,7 +630,7 @@ function renderRanking(){
     <div class="rank-item">
       <div class="rank-num ${numClass(i)}">${i+1}</div>
       <div class="rank-name" title="${esc(item.name)}">${esc(item.name)}</div>
-      <div class="rank-score" style="color:${scoreColor(item.avg)}">${Math.round(item.avg)}</div>
+      <div class="rank-score" style="color:${scoreColor(item.avg)}">${item.avg.toFixed(2)}</div>
       <div class="rank-meta">🔴${item.red}家</div>
     </div>`).join('');
 }
@@ -660,7 +660,7 @@ function renderPage(){
     ?`<tr><td colspan="16" style="text-align:center;padding:40px;color:var(--text-muted)">暂无数据</td></tr>`
     :rows.map((r,i)=>{
       const rank=s+i+1;
-      const sc=r.experience_score!=null?Math.round(r.experience_score):'—';
+      const sc=r.experience_score!=null?Number(r.experience_score).toFixed(2):'—';
       const scCls=r.alert_level==='red'?'score-red':r.alert_level==='yellow'?'score-yellow':'score-green';
       const badge=r.alert_level==='red'?'<span class="badge badge-red">🔴 预警</span>'
         :r.alert_level==='yellow'?'<span class="badge badge-yellow">🟡 跟进</span>'
