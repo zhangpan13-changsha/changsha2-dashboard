@@ -282,8 +282,9 @@
         <div class="filter-divider"></div>
         <div class="filter-group">
           <span class="filter-label">BD</span>
-          <input class="filter-input" id="filterBD" list="listBD" placeholder="全部BD" autocomplete="off" oninput="debounceLoad()" />
+          <input class="filter-input" id="filterBD" list="listBD" placeholder="全部BD" autocomplete="off" oninput="debounceLoad();updateBDRankBadge()" />
           <datalist id="listBD"></datalist>
+          <span id="bdRankBadge" style="display:none;margin-left:8px;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;background:var(--yellow-dim);color:var(--yellow);border:1px solid rgba(255,193,7,.3);white-space:nowrap;cursor:default"></span>
         </div>
         <!-- 在线状态筛选器已隐藏：默认只拉在线商家(is_online=true)，无需显示 -->
         <select id="filterOnline" style="display:none"><option value="true" selected>在线营业</option></select>
@@ -654,7 +655,7 @@ async function loadData(){
     }
     await populateFilters();
     renderKPIs(); renderCharts(); renderRanking(); renderTeamRanking(); renderBDRanking();
-    updateContactRankBadge(); updateTeamRankBadge();
+    updateContactRankBadge(); updateTeamRankBadge(); updateBDRankBadge();
     applyTab(curTab);
     const now=new Date();
     document.getElementById('lastUpdateBadge').textContent=
@@ -1080,6 +1081,28 @@ function updateTeamRankBadge(){
   if(!tm){badge.style.display='none';return;}
   if(!_allTeamRanking.length) buildContactRanking();
   _applyRankBadge(badge, _allTeamRanking.findIndex(r=>r.name===tm), _allTeamRanking.length);
+}
+
+function updateBDRankBadge(){
+  const badge=document.getElementById('bdRankBadge');
+  const bd=document.getElementById('filterBD').value.trim();
+  if(!bd){badge.style.display='none';return;}
+  if(!rawData.length){badge.style.display='none';return;}
+  // 确定 BD 所属城市团队（取该 BD 名下第一条数据）
+  const bdRow=rawData.find(r=>r.bd_name===bd);
+  if(!bdRow){badge.style.display='none';return;}
+  const bdTeam=extractTeam(bdRow.contact_point, bdRow.city);
+  // 用与 renderBDRanking 右列相同的数据范围：该城市团队全量
+  const teamData=rawData.filter(r=>extractTeam(r.contact_point,r.city)===bdTeam);
+  // 按BD聚合均分
+  const map={};
+  teamData.forEach(r=>{
+    const name=r.bd_name||'未知';
+    if(!map[name]) map[name]={sum:0,count:0};
+    if(r.experience_score!=null){map[name].sum+=r.experience_score;map[name].count++;}
+  });
+  const sorted=Object.entries(map).map(([name,v])=>({name,avg:v.count?v.sum/v.count:0})).sort((a,b)=>b.avg-a.avg);
+  _applyRankBadge(badge, sorted.findIndex(r=>r.name===bd), sorted.length);
 }
 
 function renderTeamRanking(){
