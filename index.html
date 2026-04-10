@@ -308,6 +308,20 @@
         <button class="view-tab-btn"        id="vtab-cqs"      onclick="switchView('cqs')">CQS概览</button>
         <button class="view-tab-btn"        id="vtab-detail"   onclick="switchView('detail')">商家明细</button>
       </div>
+      <style>
+      /* BD排名板块 */
+      .bd-rank-item{display:flex;align-items:center;padding:7px 8px;border-radius:6px;gap:8px;margin-bottom:4px;background:var(--card-inner,rgba(255,255,255,.03));transition:background .15s;}
+      .bd-rank-item:hover{background:rgba(255,193,7,.06);}
+      .bd-rank-num{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;}
+      .bd-rank-num.gold{background:#FFD700;color:#1a1a1a;}
+      .bd-rank-num.silver{background:#C0C0C0;color:#1a1a1a;}
+      .bd-rank-num.bronze{background:#CD7F32;color:#fff;}
+      .bd-rank-num.normal{background:rgba(255,255,255,.1);color:var(--text-muted);}
+      .bd-rank-num.bottom-rank{background:rgba(244,67,54,.2);color:var(--red);}
+      .bd-rank-name{flex:1;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+      .bd-rank-score{font-size:14px;font-weight:700;min-width:48px;text-align:right;}
+      .bd-rank-meta{font-size:11px;color:var(--text-muted);min-width:48px;text-align:right;}
+      </style>
 
       <!-- 视图：竞争分概览 -->
       <div id="view-overview">
@@ -373,6 +387,27 @@
           <div>
             <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;padding-left:4px">🏙️ 城市团队（全部）</div>
             <div class="rank-list" id="teamRankList">
+              <div class="loading-overlay" style="padding:20px"><div class="spinner"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BD排名大板块 -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-title"><span class="card-title-dot"></span>BD排名</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:8px">
+          <!-- BD在联络点内的排名 -->
+          <div>
+            <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;padding-left:4px">📍 在联络点内排名（按当前联络点范围）</div>
+            <div id="bdRankInContact" class="rank-list">
+              <div class="loading-overlay" style="padding:20px"><div class="spinner"></div></div>
+            </div>
+          </div>
+          <!-- BD在城市团队内的排名 -->
+          <div>
+            <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;padding-left:4px">🏙️ 在城市团队内排名（全团队视角）</div>
+            <div id="bdRankInTeam" class="rank-list">
               <div class="loading-overlay" style="padding:20px"><div class="spinner"></div></div>
             </div>
           </div>
@@ -595,7 +630,7 @@ async function loadData(){
       allData=[...rawData];
     }
     await populateFilters();
-    renderKPIs(); renderCharts(); renderRanking(); renderTeamRanking();
+    renderKPIs(); renderCharts(); renderRanking(); renderTeamRanking(); renderBDRanking();
     updateContactRankBadge(); updateTeamRankBadge();
     applyTab(curTab);
     const now=new Date();
@@ -1046,6 +1081,68 @@ function renderTeamRanking(){
       <div class="rank-score" style="color:${scoreColor(item.avg)}">${item.avg.toFixed(2)}</div>
       <div class="rank-meta">🔴${item.red}家</div>
     </div>`).join('');
+}
+
+/* ── BD排名 ── */
+function renderBDRanking(){
+  const scoreColor=v=>v<90?'var(--red)':v<100?'var(--yellow)':'var(--green)';
+  const numCls=(i,total)=>{
+    if(i===0) return 'gold'; if(i===1) return 'silver'; if(i===2) return 'bronze';
+    if(i>=total-1) return 'bottom-rank'; return 'normal';
+  };
+  const buildList=(data, container)=>{
+    // 按BD聚合
+    const map={};
+    data.forEach(r=>{
+      const bd=r.bd_name||'未知';
+      if(!map[bd]) map[bd]={sum:0,count:0,red:0,yellow:0};
+      if(r.experience_score!=null){map[bd].sum+=r.experience_score;map[bd].count++;}
+      if(r.alert_level==='red') map[bd].red++;
+      if(r.alert_level==='yellow') map[bd].yellow++;
+    });
+    const sorted=Object.entries(map).map(([name,v])=>({
+      name, avg:v.count?(v.sum/v.count):0, count:v.count, red:v.red, yellow:v.yellow
+    })).sort((a,b)=>b.avg-a.avg);
+    const total=sorted.length;
+    if(!total){
+      document.getElementById(container).innerHTML='<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:12px">暂无数据</div>';
+      return;
+    }
+    document.getElementById(container).innerHTML=sorted.map((item,i)=>`
+      <div class="bd-rank-item">
+        <div class="bd-rank-num ${numCls(i,total)}">${i+1}</div>
+        <div class="bd-rank-name" title="${esc(item.name)}">${esc(item.name)}</div>
+        <div class="bd-rank-score" style="color:${scoreColor(item.avg)}">${item.avg.toFixed(2)}</div>
+        <div class="bd-rank-meta">🔴${item.red} 🟡${item.yellow}</div>
+      </div>`).join('');
+  };
+
+  // 左列：当前 allData 范围内（受筛选影响，体现在联络点/BD范围内的排名）
+  buildList(allData, 'bdRankInContact');
+
+  // 右列：按城市团队聚合全量 rawData（不受BD/联络点筛选影响，只保留与当前城市团队一致的数据）
+  const cp=document.getElementById('filterContact').value.trim();
+  const team=document.getElementById('filterTeam').value.trim();
+  const city=document.getElementById('filterCity').value.trim();
+  // 找到当前筛选对应的城市团队
+  let targetTeam=team;
+  if(!targetTeam && cp){
+    // 从 rawData 里找这个联络点对应的城市团队
+    const found=rawData.find(r=>r.contact_point===cp);
+    if(found) targetTeam=extractTeam(found.contact_point, found.city);
+  }
+  if(!targetTeam && city){
+    // 只有城市筛选，取第一个联络点的团队
+    const found=rawData.find(r=>r.city===city);
+    if(found) targetTeam=extractTeam(found.contact_point, found.city);
+  }
+  if(targetTeam){
+    const teamData=rawData.filter(r=>extractTeam(r.contact_point,r.city)===targetTeam);
+    buildList(teamData, 'bdRankInTeam');
+  } else {
+    // 无筛选时展示全量BD排名
+    buildList(rawData, 'bdRankInTeam');
+  }
 }
 
 /* ── 视图切换 ── */
