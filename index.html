@@ -48,6 +48,8 @@
     /* tooltip on collapsed */
     .sidebar.collapsed .nav-item[data-tip]{position:relative}
     .sidebar.collapsed .nav-item[data-tip]::after{content:attr(data-tip);position:absolute;left:calc(100% + 8px);top:50%;transform:translateY(-50%);background:#2a2d3e;border:1px solid var(--border);color:var(--text-primary);padding:5px 10px;border-radius:6px;font-size:12px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .15s;z-index:999}
+    .sidebar.collapsed .sidebar-collapse-label{display:none}
+    .sidebar.collapsed #sidebarCollapseBtn{justify-content:center;padding:9px 0}
     .sidebar.collapsed .nav-item[data-tip]:hover::after{opacity:1}
     .sidebar-toggle{display:none}
 
@@ -228,6 +230,23 @@
       </div>
     </div>
 
+    <!-- 侧边栏底部收起按钮 -->
+    <div style="padding:10px 8px;border-top:1px solid var(--border)">
+      <div onclick="toggleSidebar()" title="收起/展开侧边栏" data-tip="收起侧边栏"
+        style="display:flex;align-items:center;justify-content:center;gap:8px;
+               padding:9px 10px;border-radius:9px;cursor:pointer;
+               color:var(--text-muted);transition:background .18s,color .18s;
+               white-space:nowrap;overflow:hidden"
+        onmouseover="this.style.background='var(--bg-card-hover)';this.style.color='var(--yellow)'"
+        onmouseout="this.style.background='';this.style.color='var(--text-muted)'"
+        id="sidebarCollapseBtn">
+        <svg id="floatBtnIcon" width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 2L5 7l4 5"/>
+        </svg>
+        <span class="sidebar-collapse-label" style="font-size:12px">收起侧边栏</span>
+      </div>
+    </div>
+
   </nav>
 
   <!-- Main -->
@@ -242,18 +261,6 @@
       </div>
       <div style="display:flex;align-items:center;gap:10px;">
         <div class="topbar-badge" id="lastUpdateBadge">数据加载中…</div>
-        <button id="sidebarToggleBtn" onclick="toggleSidebar()" title="收起/展开侧边栏" style="
-          width:32px;height:32px;border-radius:8px;
-          background:var(--bg-secondary);border:1px solid var(--border);
-          color:var(--text-secondary);cursor:pointer;
-          display:flex;align-items:center;justify-content:center;
-          transition:background .18s,border-color .18s,color .18s;flex-shrink:0;
-        " onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--yellow)'"
-           onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-secondary)'">
-          <svg id="floatBtnIcon" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M9 2L5 7l4 5"/>
-          </svg>
-        </button>
       </div>
     </div>
 
@@ -593,7 +600,13 @@ function toggleSidebar() {
   sb.classList.toggle('collapsed');
   const collapsed = sb.classList.contains('collapsed');
   const icon = document.getElementById('floatBtnIcon');
+  // 展开状态：箭头朝左（< 收起）；折叠状态：箭头朝右（> 展开）
   if(icon) icon.style.transform = collapsed ? 'rotate(180deg)' : '';
+  // 折叠时更新 tooltip 和文字
+  const btn = document.getElementById('sidebarCollapseBtn');
+  if(btn) btn.title = collapsed ? '展开侧边栏' : '收起侧边栏';
+  const lbl = btn && btn.querySelector('.sidebar-collapse-label');
+  if(lbl) lbl.textContent = collapsed ? '展开侧边栏' : '收起侧边栏';
 }
 
 
