@@ -347,7 +347,7 @@
 
       <div class="grid-2">
         <div class="card">
-          <div class="card-title"><span class="card-title-dot"></span>9项指标落败率</div>
+          <div class="card-title"><span class="card-title-dot"></span>9项指标 · 均分 &amp; 落败率</div>
           <div class="chart-wrap"><canvas id="defeatChart"></canvas></div>
         </div>
         <div class="card">
@@ -465,7 +465,7 @@ const SB_KEY = 'sb_publishable_TThJ3m4iPyAq58lb6KYreg_b65QF9cB';
 const TABLE  = 'merchants';
 const PAGE_SIZE = 50, BATCH = 1000;
 
-let allData=[], filteredData=[], curPage=1, curTab='all', chartInst=null, worst2Keys=[];
+let allData=[], filteredData=[], curPage=1, curTab='all', chartInst=null, worst2Keys=[], prevChartData=null;
 
 const METRICS=[
   {key:'f_starting_price',label:'起步价'},
@@ -727,38 +727,128 @@ function buildFilterParams(){
 
 function renderCharts(){
   const n=allData.length||1;
-  const rates=METRICS.map(m=>{
-    const d=allData.filter(r=>r[m.key]===1).length;
-    return +((d/n)*100).toFixed(1);
+  const rates=METRICS.map(m=>+((allData.filter(r=>r[m.key]===1).length/n)*100).toFixed(1));
+  // 各指标均分（score字段名：f_xxx对应xxx_score）
+  const scoreKeys={
+    f_starting_price:'starting_price_score',f_biz_hours:'biz_hours_score',
+    f_manjian:'manjian_score',f_delivery_fee:'delivery_fee_score',
+    f_cashback:'cashback_score',f_ladder:'ladder_score',
+    f_hot_dish:'hot_dish_score',f_cqs_coverage:'cqs_coverage_score',f_cqs_price:'cqs_price_score'
+  };
+  const avgs=METRICS.map(m=>{
+    const sk=scoreKeys[m.key];
+    const valid=allData.filter(r=>r[sk]!=null);
+    return valid.length?+(valid.reduce((s,r)=>s+r[sk],0)/valid.length).toFixed(1):null;
   });
-  const colors=rates.map(v=>v>=30?'rgba(244,67,54,.85)':v>=15?'rgba(255,193,7,.85)':'rgba(76,175,80,.75)');
+  // 颜色：落败率高→红，中→黄，低→绿
+  const barColors=rates.map(v=>v>=30?'rgba(244,67,54,.85)':v>=15?'rgba(255,193,7,.85)':'rgba(76,175,80,.75)');
   const sorted=[...rates].map((v,i)=>({v,i})).sort((a,b)=>b.v-a.v);
-  METRICS.forEach((_,i)=>{
-    const th=document.getElementById(`th-${METRICS[i].key}`);
-    if(th) th.classList.remove('worst-col');
-  });
-  sorted.slice(0,2).forEach(({i})=>{
-    const th=document.getElementById(`th-${METRICS[i].key}`);
-    if(th) th.classList.add('worst-col');
-  });
+  METRICS.forEach((_,i)=>{const th=document.getElementById(`th-${METRICS[i].key}`);if(th)th.classList.remove('worst-col');});
+  sorted.slice(0,2).forEach(({i})=>{const th=document.getElementById(`th-${METRICS[i].key}`);if(th)th.classList.add('worst-col');});
   worst2Keys=sorted.slice(0,2).map(({i})=>METRICS[i].key);
   if(chartInst) chartInst.destroy();
   chartInst=new Chart(document.getElementById('defeatChart').getContext('2d'),{
     type:'bar',
     data:{
       labels:METRICS.map(m=>m.label),
-      datasets:[{label:'落败率(%)',data:rates,backgroundColor:colors,borderRadius:6,borderSkipped:false}]
+      datasets:[
+        {
+          type:'bar',label:'落败率(%)',data:rates,
+          backgroundColor:barColors,borderRadius:6,borderSkipped:false,
+          yAxisID:'yRate',order:2
+        },
+        {
+          type:'line',label:'均分',data:avgs,
+          borderColor:'rgba(255,193,7,0.9)',backgroundColor:'rgba(255,193,7,0.15)',
+          pointBackgroundColor:'rgba(255,193,7,1)',pointRadius:5,pointHoverRadius:7,
+          borderWidth:2.5,tension:0.35,fill:false,
+          yAxisID:'yScore',order:1
+        }
+      ]
     },
     options:{
       responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.raw}%`}}},
+      interaction:{mode:'index',intersect:false},
+      plugins:{
+        legend:{
+          display:true,
+          labels:{color:'#9fa8c9',font:{size:11},boxWidth:12,padding:14}
+        },
+        tooltip:{
+          callbacks:{
+            label(ctx){
+              const label=ctx.dataset.label;
+              const val=ctx.raw;
+              if(val==null) return `${label}: 暂无数据`;
+              if(label==='落败率(%)'){
+                let base=` 落败率: ${val}%`;
+                if(prevChartData){
+                  const pv=prevChartData.rates[ctx.dataIndex];
+                  const diff=+(val-pv).toFixed(1);
+                  base+=diff>0?`  ↑${diff}% 较上期`:diff<0?`  ↓${Math.abs(diff)}% 较上期`:`  持平`;
+                }
+                return base;
+              }
+              if(label==='均分'){
+                let base=` 均分: ${val}`;
+                if(prevChartData){
+                  const pv=prevChartData.avgs[ctx.dataIndex];
+                  if(pv!=null){
+                    const diff=+(val-pv).toFixed(1);
+                    base+=diff>0?`  ↑${diff} 较上期`:diff<0?`  ↓${Math.abs(diff)} 较上期`:`  持平`;
+                  }
+                }
+                return base;
+              }
+              return `${label}: ${val}`;
+            }
+          }
+        }
+      },
       scales:{
-        x:{ticks:{color:'#9fa8c9',font:{size:11},maxRotation:45,minRotation:30},grid:{color:'rgba(46,50,80,.5)'}},
-        y:{ticks:{color:'#9fa8c9',font:{size:11},callback:v=>v+'%'},grid:{color:'rgba(46,50,80,.5)'},
-           max:Math.min(100,Math.ceil((Math.max(...rates)+10)/10)*10)}
+        x:{ticks:{color:'#9fa8c9',font:{size:11},maxRotation:30,minRotation:0},grid:{color:'rgba(46,50,80,.5)'}},
+        yRate:{
+          type:'linear',position:'left',
+          ticks:{color:'#9fa8c9',font:{size:11},callback:v=>v+'%'},
+          grid:{color:'rgba(46,50,80,.5)'},
+          title:{display:true,text:'落败率',color:'#9fa8c9',font:{size:10}},
+          max:Math.min(100,Math.ceil((Math.max(...rates)+15)/10)*10),min:0
+        },
+        yScore:{
+          type:'linear',position:'right',
+          ticks:{color:'rgba(255,193,7,.8)',font:{size:11}},
+          grid:{drawOnChartArea:false},
+          title:{display:true,text:'均分',color:'rgba(255,193,7,.8)',font:{size:10}},
+          min:50,max:100
+        }
       }
     }
   });
+  // 异步加载上期数据用于 tooltip 对比
+  loadPrevChartData();
+}
+
+async function loadPrevChartData(){
+  try{
+    const res=await fetch(`${SB_URL}/rest/v1/merchants?select=data_date&limit=10000`,{
+      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}
+    });
+    const rows=await res.json();
+    const dates=[...new Set(rows.map(r=>r.data_date))].sort();
+    if(dates.length<2){prevChartData=null;return;}
+    const prevDate=dates[dates.length-2];
+    const filterParams=buildFilterParams();
+    const scoreFields='f_starting_price,f_biz_hours,f_manjian,f_delivery_fee,f_cashback,f_ladder,f_hot_dish,f_cqs_coverage,f_cqs_price,starting_price_score,biz_hours_score,manjian_score,delivery_fee_score,cashback_score,ladder_score,hot_dish_score,cqs_coverage_score,cqs_price_score';
+    const url=`${SB_URL}/rest/v1/merchants?select=${scoreFields}&data_date=eq.${prevDate}${filterParams}&limit=10000`;
+    const res2=await fetch(url,{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});
+    const yd=await res2.json();
+    const yn=yd.length||1;
+    const scoreKeys={f_starting_price:'starting_price_score',f_biz_hours:'biz_hours_score',f_manjian:'manjian_score',f_delivery_fee:'delivery_fee_score',f_cashback:'cashback_score',f_ladder:'ladder_score',f_hot_dish:'hot_dish_score',f_cqs_coverage:'cqs_coverage_score',f_cqs_price:'cqs_price_score'};
+    prevChartData={
+      rates:METRICS.map(m=>+((yd.filter(r=>r[m.key]===1).length/yn)*100).toFixed(1)),
+      avgs:METRICS.map(m=>{const sk=scoreKeys[m.key];const v=yd.filter(r=>r[sk]!=null);return v.length?+(v.reduce((s,r)=>s+r[sk],0)/v.length).toFixed(1):null;})
+    };
+  }catch(e){prevChartData=null;}
 }
 
 function renderRanking(){
