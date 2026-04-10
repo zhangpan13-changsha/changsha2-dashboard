@@ -436,12 +436,16 @@
         <div id="detailFilters" style="display:flex;align-items:center;gap:12px;padding:10px 0 4px 0;flex-wrap:wrap;">
           <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted)">
             <span>得分区间</span>
-            <select id="dfScoreOp" onchange="applyDetailFilter();document.getElementById('dfScoreVal').style.display=this.value?'inline-block':'none';document.getElementById('dfScoreVal').value=''" style="background:var(--card-bg);border:1px solid var(--border);color:var(--text-primary);border-radius:6px;padding:3px 8px;font-size:12px;cursor:pointer">
+            <select id="dfScoreOp" onchange="onScoreOpChange()" style="background:var(--card-bg);border:1px solid var(--border);color:var(--text-primary);border-radius:6px;padding:3px 8px;font-size:12px;cursor:pointer">
               <option value="">不限</option>
               <option value="lt">低于</option>
               <option value="gt">高于</option>
+              <option value="between">介于</option>
             </select>
-            <input id="dfScoreVal" type="number" min="0" max="100" placeholder="输入分值" oninput="applyDetailFilter()" style="display:none;width:72px;background:var(--card-bg);border:1px solid var(--border);color:var(--text-primary);border-radius:6px;padding:3px 8px;font-size:12px">
+            <input id="dfScoreVal" type="number" min="0" max="100" placeholder="分值" oninput="applyDetailFilter()" style="display:none;width:64px;background:var(--card-bg);border:1px solid var(--border);color:var(--text-primary);border-radius:6px;padding:3px 8px;font-size:12px">
+            <span id="dfBetweenSep" style="display:none;color:var(--text-muted)">~</span>
+            <input id="dfScoreVal2" type="number" min="0" max="100" placeholder="分值" oninput="applyDetailFilter()" style="display:none;width:64px;background:var(--card-bg);border:1px solid var(--border);color:var(--text-primary);border-radius:6px;padding:3px 8px;font-size:12px">
+            <span id="dfScoreUnit" style="display:none;color:var(--text-muted)">分</span>
           </div>
           <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted)">
             <span>落败指标</span>
@@ -1286,18 +1290,44 @@ function toggleDetailRow(id){
   row.style.display=row.style.display==='none'?'table-row':'none';
 }
 
+function onScoreOpChange(){
+  const op=document.getElementById('dfScoreOp').value;
+  const v1=document.getElementById('dfScoreVal');
+  const v2=document.getElementById('dfScoreVal2');
+  const sep=document.getElementById('dfBetweenSep');
+  const unit=document.getElementById('dfScoreUnit');
+  v1.value=''; v2.value='';
+  if(!op){
+    v1.style.display='none'; v2.style.display='none';
+    sep.style.display='none'; unit.style.display='none';
+  } else if(op==='between'){
+    v1.style.display='inline-block'; sep.style.display='inline-block';
+    v2.style.display='inline-block'; unit.style.display='inline-block';
+  } else {
+    v1.style.display='inline-block'; unit.style.display='inline-block';
+    v2.style.display='none'; sep.style.display='none';
+  }
+  applyDetailFilter();
+}
+
 function applyDetailFilter(){
   const op=document.getElementById('dfScoreOp')?.value||'';
   const val=parseFloat(document.getElementById('dfScoreVal')?.value||'');
+  const val2=parseFloat(document.getElementById('dfScoreVal2')?.value||'');
   const metric=document.getElementById('dfMetric')?.value||'';
   // 基于 allData（已经受顶部筛选影响）再做二次过滤
   const base=curTab==='red'?allData.filter(r=>r.alert_level==='red')
     :curTab==='yellow'?allData.filter(r=>r.alert_level==='yellow')
     :allData;
   filteredData=base.filter(r=>{
-    if(op==='lt' && !isNaN(val) && r.experience_score!=null && Number(r.experience_score)>=val) return false;
-    if(op==='gt' && !isNaN(val) && r.experience_score!=null && Number(r.experience_score)<=val) return false;
-    if(metric && r[metric]!==1) return false;
+    const sc=r.experience_score!=null?Number(r.experience_score):null;
+    if(op==='lt' && !isNaN(val) && sc!=null && sc>=val) return false;
+    if(op==='gt' && !isNaN(val) && sc!=null && sc<=val) return false;
+    if(op==='between' && !isNaN(val) && !isNaN(val2) && sc!=null){
+      const lo=Math.min(val,val2), hi=Math.max(val,val2);
+      if(sc<lo || sc>hi) return false;
+    }
+    if(metric){ const m=METRICS.find(x=>x.key===metric); if(m && !isDefeated(r,m)) return false; }
     return true;
   });
   curPage=1;
@@ -1309,9 +1339,10 @@ function applyDetailFilter(){
 function clearDetailFilter(){
   const op=document.getElementById('dfScoreOp');
   const val=document.getElementById('dfScoreVal');
+  const val2=document.getElementById('dfScoreVal2');
   const metric=document.getElementById('dfMetric');
-  if(op) op.value='';
-  if(val) val.value='';
+  if(op){op.value=''; onScoreOpChange();}
+  if(val2) val2.value='';
   if(metric) metric.value='';
   const cnt=document.getElementById('dfResultCount');
   if(cnt) cnt.textContent='';
