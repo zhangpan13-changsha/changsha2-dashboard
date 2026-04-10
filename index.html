@@ -482,7 +482,7 @@ const SB_KEY = 'sb_publishable_TThJ3m4iPyAq58lb6KYreg_b65QF9cB';
 const TABLE  = 'merchants';
 const PAGE_SIZE = 50, BATCH = 1000;
 
-let allData=[], filteredData=[], curPage=1, curTab='all', chartInst=null, worst2Keys=[], prevChartData=null;
+let allData=[], rawData=[], filteredData=[], curPage=1, curTab='all', chartInst=null, worst2Keys=[], prevChartData=null;
 
 const METRICS=[
   {key:'f_starting_price',label:'起步价'},
@@ -569,9 +569,16 @@ async function loadData(){
     `<tr><td colspan="16"><div class="loading-overlay"><div class="spinner"></div><span>加载中…</span></div></td></tr>`;
   try{
     allData=await fetchAll(city,team,cp,bd,on);
+    // 全量数据（无任何筛选）单独缓存，供节点排名+badge使用
+    if(!city&&!team&&!cp&&!bd&&!on){
+      rawData=[...allData];
+      buildContactRanking();
+    } else if(!rawData.length){
+      // 首次带筛选进入时也要拉一次全量
+      rawData=await fetchAll('','','','','');
+      buildContactRanking();
+    }
     await populateFilters();
-    // 无筛选时重建全量排名（供badge使用）
-    if(!city&&!team&&!cp&&!bd&&!on) buildContactRanking();
     renderKPIs(); renderCharts(); renderRanking(); renderTeamRanking();
     updateContactRankBadge(); updateTeamRankBadge();
     applyTab(curTab);
@@ -877,7 +884,7 @@ async function loadPrevChartData(){
 let _allContactRanking=[], _allTeamRanking=[];
 
 function buildContactRanking(){
-  const src=allData; // 当前无筛选时调用，即为全量
+  const src=rawData.length?rawData:allData; // 优先用全量缓存
   // --- 联络点 ---
   const cpMap={};
   src.forEach(r=>{
